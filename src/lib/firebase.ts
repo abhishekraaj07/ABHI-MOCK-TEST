@@ -21,10 +21,25 @@ import {
   getDocs,
   limit,
 } from 'firebase/firestore';
-import firebaseConfig from '../../firebase-applet-config.json';
+import defaultConfig from '../../firebase-applet-config.example.json';
 
-// Initialize Firebase App singleton
-export const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+// Safely discover local uncommitted config if present, otherwise use example config
+const localConfigs = import.meta.glob('../../firebase-applet-config.json', { eager: true });
+const localConfig = (localConfigs['../../firebase-applet-config.json'] as any)?.default || {};
+
+const firebaseConfig = {
+  ...defaultConfig,
+  ...localConfig,
+  apiKey:
+    import.meta.env.VITE_FIREBASE_API_KEY ||
+    localConfig.apiKey ||
+    defaultConfig.apiKey ||
+    'development-placeholder-key',
+};
+
+// Initialize Firebase App singleton safely
+export const app: FirebaseApp =
+  getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize Firebase Auth
 export const auth = getAuth(app);

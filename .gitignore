@@ -16,6 +16,8 @@ coverage/
 .env.test.local
 .env.production.local
 !.env.example
+firebase-applet-config.json
+!firebase-applet-config.example.json
 
 # Logs & Debugging
 *.log
