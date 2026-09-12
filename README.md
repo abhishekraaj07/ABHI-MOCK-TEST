@@ -8,6 +8,7 @@
 
 ---
 
+[![Cloudflare Pages](https://img.shields.io/badge/Live%20Demo-Cloudflare%20Pages-F38020?logo=cloudflare&logoColor=white)](https://abhi-mock-test.pages.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19.0-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![Express.js](https://img.shields.io/badge/Express.js-4.21-lightgrey?logo=express&logoColor=black)](https://expressjs.com/)
@@ -17,6 +18,8 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38B2AC?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![Tests Passing](https://img.shields.io/badge/Tests-15%2F15%20Passing-brightgreen?logo=checkmarx&logoColor=white)]()
 [![Code Quality](https://img.shields.io/badge/TypeCheck-0%20Errors-emerald)]()
+
+### 🔗 **Live URL:** [https://abhi-mock-test.pages.dev](https://abhi-mock-test.pages.dev)
 
 </div>
 
