@@ -9,6 +9,7 @@
     "start": "node dist/server.cjs",
     "seed": "tsx prisma/seed.ts",
     "lint": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
     "deploy": "wrangler pages deploy dist --project-name=abhi-mock-test --branch=main"
   },
   "dependencies": {

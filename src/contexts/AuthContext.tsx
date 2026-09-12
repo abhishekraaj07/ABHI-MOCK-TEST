@@ -9,7 +9,6 @@ import {
 import {
   signInWithPopup,
   signOut as firebaseSignOut,
-  onAuthStateChanged,
   User as FirebaseUser,
 } from 'firebase/auth';
 
@@ -28,43 +27,36 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('abhi_token'));
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Sync session on mount
+  // Sync session on mount via secure HTTP-only cookie
   useEffect(() => {
     async function checkAuth() {
-      const storedToken = localStorage.getItem('abhi_token');
-      if (!storedToken) {
-        setLoading(false);
-        return;
-      }
-
       try {
         const res = await apiFetch('/api/auth/me', {
-          headers: {
-            Authorization: `Bearer ${storedToken}`,
-          },
+          credentials: 'include',
         });
 
         if (res.ok) {
           const data = await res.json();
-          setUser(data.user);
-          setToken(storedToken);
-
-          // Keep Firestore user doc up to date
-          if (data.user?.id) {
+          if (data.user) {
+            setUser(data.user);
+            // Keep Firestore user doc up to date
             syncUserToFirestore(data.user);
+          } else {
+            setUser(null);
           }
         } else {
-          // Token expired or invalid
-          localStorage.removeItem('abhi_token');
           setUser(null);
-          setToken(null);
         }
       } catch (err) {
-        console.warn('Session verification deferred:', err);
+        console.warn('Session check notice:', err);
+        setUser(null);
       } finally {
+        // Clean up any legacy localStorage tokens for security (§Phase 2 & 22)
+        try {
+          localStorage.removeItem('abhi_token');
+        } catch {}
         setLoading(false);
       }
     }
@@ -78,20 +70,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        return { success: false, error: data.error || 'Login failed' };
+        const errMsg = data.error?.message || data.error || 'Invalid email or password.';
+        return { success: false, error: errMsg };
       }
 
       setUser(data.user);
-      setToken(data.token);
-      localStorage.setItem('abhi_token', data.token);
 
       // Background persist to Firestore
-      syncUserToFirestore(data.user);
+      if (data.user) {
+        syncUserToFirestore(data.user);
+      }
 
       return { success: true };
     } catch (err: any) {
@@ -105,20 +99,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ name, email, password, confirmPassword }),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        return { success: false, error: data.error || 'Registration failed' };
+        const errMsg = data.error?.message || data.error || 'Registration failed.';
+        return { success: false, error: errMsg };
       }
 
       setUser(data.user);
-      setToken(data.token);
-      localStorage.setItem('abhi_token', data.token);
 
       // Persist to Firestore
-      syncUserToFirestore(data.user);
+      if (data.user) {
+        syncUserToFirestore(data.user);
+      }
 
       return { success: true };
     } catch (err: any) {
@@ -126,46 +122,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Google Sign-In with Firebase Auth
+  // Google Sign-In with Firebase Auth & Server ID Token Verification
   const signInWithGoogle = async () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const fbUser: FirebaseUser = result.user;
 
-      // Sync with server session & Prisma database
+      // Obtain verified cryptographically signed ID token from Firebase
+      const idToken = await fbUser.getIdToken();
+
+      // Sync with server session & Prisma database via server-verified token (§Phase 2)
       const res = await fetch('/api/auth/firebase-sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
-          uid: fbUser.uid,
+          idToken,
           email: fbUser.email,
-          name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Aspirant',
+          name: fbUser.displayName,
           photoURL: fbUser.photoURL,
         }),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        return { success: false, error: data.error || 'Failed to initialize session with Google account.' };
+        const errMsg = data.error?.message || data.error || 'Failed to initialize session with Google account.';
+        return { success: false, error: errMsg };
       }
 
       setUser(data.user);
-      setToken(data.token);
-      localStorage.setItem('abhi_token', data.token);
 
       // Persist to Firestore database
-      await syncUserToFirestore({
-        id: data.user.id,
-        email: data.user.email,
-        name: data.user.name,
-        role: data.user.role,
-        photoURL: fbUser.photoURL,
-      });
+      if (data.user) {
+        await syncUserToFirestore({
+          id: data.user.id,
+          email: data.user.email,
+          name: data.user.name,
+          role: data.user.role,
+          photoURL: fbUser.photoURL,
+        });
+      }
 
       return { success: true };
     } catch (error: any) {
       console.error('Google sign-in error:', error);
-      // Helpful error message if popups are blocked or cancelled
       if (error.code === 'auth/popup-closed-by-user') {
         return { success: false, error: 'Sign-in popup was closed before completing.' };
       }
@@ -178,7 +178,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     } catch (e) {
       // Ignore
     }
@@ -187,20 +187,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       // Ignore
     }
-    localStorage.removeItem('abhi_token');
+    try {
+      localStorage.removeItem('abhi_token');
+    } catch {}
     setUser(null);
-    setToken(null);
   };
 
   const updateProfileName = async (name: string) => {
-    if (!token) return false;
     try {
       const res = await fetch('/api/auth/profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
+        credentials: 'include',
         body: JSON.stringify({ name }),
       });
       if (res.ok) {
@@ -219,7 +219,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         user,
-        token,
+        token: null, // Tokens stored strictly in HTTP-only cookies
         loading,
         login,
         register,

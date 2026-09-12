@@ -230,40 +230,45 @@ router.post('/:id/start', authenticate, async (req: AuthRequest, res: Response) 
       });
     }
 
-    // Create new attempt
-    const attempt = await prisma.attempt.create({
-      data: {
-        userId,
-        testId: test.id,
-        status: 'IN_PROGRESS',
-        startedAt: new Date(),
-        score: 0,
-        percentage: 0,
-        accuracy: 0,
-        correctCount: 0,
-        wrongCount: 0,
-        unansweredCount: test.testQuestions.length,
-      },
+    // Create new attempt atomically in a database transaction (§Phase 11)
+    const attempt = await prisma.$transaction(async (tx) => {
+      const newAttempt = await tx.attempt.create({
+        data: {
+          userId,
+          testId: test.id,
+          status: 'IN_PROGRESS',
+          startedAt: new Date(),
+          score: 0,
+          percentage: 0,
+          accuracy: 0,
+          correctCount: 0,
+          wrongCount: 0,
+          unansweredCount: test.testQuestions.length,
+        },
+      });
+
+      // Pre-create blank attempt answers
+      if (test.testQuestions.length > 0) {
+        const answerData = test.testQuestions.map((tq) => ({
+          attemptId: newAttempt.id,
+          questionId: tq.questionId,
+          selectedOption: null,
+          isCorrect: null,
+          marksObtained: 0,
+          timeSpent: 0,
+          isMarked: false,
+        }));
+
+        await tx.attemptAnswer.createMany({
+          data: answerData,
+        });
+      }
+
+      return newAttempt;
     });
 
-    // Pre-create blank attempt answers
-    if (test.testQuestions.length > 0) {
-      const answerData = test.testQuestions.map((tq) => ({
-        attemptId: attempt.id,
-        questionId: tq.questionId,
-        selectedOption: null,
-        isCorrect: null,
-        marksObtained: 0,
-        timeSpent: 0,
-        isMarked: false,
-      }));
-
-      await prisma.attemptAnswer.createMany({
-        data: answerData,
-      });
-    }
-
     return res.json({
+      success: true,
       attemptId: attempt.id,
       resumed: false,
       message: 'New test attempt initialized successfully.',

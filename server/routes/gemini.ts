@@ -74,7 +74,27 @@ router.post('/chat', async (req: Request, res: Response) => {
     } = req.body;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return res.status(400).json({ error: 'Messages array is required.' });
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_INPUT', message: 'Messages array is required.' },
+      });
+    }
+
+    // Input bounds: limit message count and length (§Phase 15)
+    if (messages.length > 20) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'PAYLOAD_TOO_LARGE', message: 'Conversation history is too long. Please start a fresh topic.' },
+      });
+    }
+
+    for (const msg of messages) {
+      if (!msg.content || typeof msg.content !== 'string' || msg.content.length > 2500) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'PAYLOAD_TOO_LARGE', message: 'Message content exceeds maximum allowed length of 2500 characters.' },
+        });
+      }
     }
 
     // Validate or default model
@@ -82,14 +102,18 @@ router.post('/chat', async (req: Request, res: Response) => {
 
     // Base system instruction
     let systemInstruction = PERSONA_INSTRUCTIONS[persona] || PERSONA_INSTRUCTIONS['exam-mentor'];
-    if (examContext) {
-      systemInstruction += `\n\nCandidate Target Context: ${JSON.stringify(examContext)}`;
+    if (examContext && typeof examContext === 'object') {
+      systemInstruction += `\n\nCandidate Target Context: ${JSON.stringify(examContext).slice(0, 500)}`;
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return res.status(500).json({
-        error: 'GEMINI_API_KEY is not configured in server environment.',
+      return res.status(503).json({
+        success: false,
+        error: {
+          code: 'AI_SERVICE_UNAVAILABLE',
+          message: 'Gemini AI mentor service is currently offline. Please configure GEMINI_API_KEY.',
+        },
       });
     }
 
@@ -98,10 +122,15 @@ router.post('/chat', async (req: Request, res: Response) => {
     // Format messages for @google/genai contents
     const contents = messages.map((m: ChatMessageInput) => ({
       role: m.role === 'user' ? 'user' : 'model',
-      parts: [{ text: m.content }],
+      parts: [{ text: m.content.slice(0, 2500) }],
     }));
 
-    const response = await ai.models.generateContent({
+    // 15-second timeout protection
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('AI response timed out after 15 seconds.')), 15000)
+    );
+
+    const generatePromise = ai.models.generateContent({
       model: targetModel,
       contents,
       config: {
@@ -110,9 +139,11 @@ router.post('/chat', async (req: Request, res: Response) => {
       },
     });
 
-    const replyText = response.text || 'No response generated from Gemini.';
+    const response: any = await Promise.race([generatePromise, timeoutPromise]);
+    const replyText = response?.text || 'No response generated from Gemini.';
 
     return res.json({
+      success: true,
       reply: replyText,
       modelUsed: targetModel,
       persona,
@@ -121,7 +152,11 @@ router.post('/chat', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Gemini chat error:', error);
     return res.status(500).json({
-      error: error?.message || 'Failed to process conversation with Gemini.',
+      success: false,
+      error: {
+        code: 'AI_PROCESSING_ERROR',
+        message: error?.message || 'Failed to process conversation with Gemini.',
+      },
     });
   }
 });

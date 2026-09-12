@@ -15,6 +15,15 @@ export interface AuthRequest extends Request {
 
 const JWT_SECRET = process.env.JWT_SECRET || 'abhi-mock-test-secret-key-2026';
 
+export const AUTH_COOKIE_NAME = 'token';
+export const AUTH_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  path: '/',
+};
+
 export function signToken(user: AuthUser): string {
   return jwt.sign(
     { id: user.id, email: user.email, name: user.name, role: user.role },
@@ -27,14 +36,21 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
   try {
     let token: string | undefined;
 
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    // Prioritize secure HTTP-only cookie, fallback to Authorization header for programmatic API calls
+    if (req.cookies && req.cookies[AUTH_COOKIE_NAME]) {
+      token = req.cookies[AUTH_COOKIE_NAME];
+    } else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
       token = req.headers.authorization.split(' ')[1];
-    } else if (req.cookies && req.cookies.token) {
-      token = req.cookies.token;
     }
 
     if (!token) {
-      return res.status(401).json({ error: 'Authentication required. Please log in.' });
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Authentication required. Please log in.',
+        },
+      });
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as any;
@@ -44,23 +60,35 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
     });
 
     if (!user) {
-      return res.status(401).json({ error: 'User account not found or deactivated.' });
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'User account not found or deactivated.',
+        },
+      });
     }
 
     req.user = user;
     next();
   } catch (error) {
-    return res.status(401).json({ error: 'Invalid or expired session. Please log in again.' });
+    return res.status(401).json({
+      success: false,
+      error: {
+        code: 'INVALID_SESSION',
+        message: 'Invalid or expired session. Please log in again.',
+      },
+    });
   }
 }
 
 export async function optionalAuth(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     let token: string | undefined;
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    if (req.cookies && req.cookies[AUTH_COOKIE_NAME]) {
+      token = req.cookies[AUTH_COOKIE_NAME];
+    } else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
       token = req.headers.authorization.split(' ')[1];
-    } else if (req.cookies && req.cookies.token) {
-      token = req.cookies.token;
     }
 
     if (token) {
@@ -81,7 +109,13 @@ export async function optionalAuth(req: AuthRequest, res: Response, next: NextFu
 
 export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
   if (!req.user || req.user.role !== 'ADMIN') {
-    return res.status(403).json({ error: 'Access denied. Administrator privileges required.' });
+    return res.status(403).json({
+      success: false,
+      error: {
+        code: 'FORBIDDEN',
+        message: 'Access denied. Administrator privileges required.',
+      },
+    });
   }
   next();
 }

@@ -1,11 +1,11 @@
 import { Router, Response } from 'express';
 import { prisma } from '../db';
-import { AuthRequest, optionalAuth } from '../middleware/auth';
+import { AuthRequest, authenticate } from '../middleware/auth';
 
 const router = Router();
 
-// GET /api/results/:id - full analytical result breakdown (§10)
-router.get('/:id', optionalAuth, async (req: AuthRequest, res: Response) => {
+// GET /api/results/:id - full analytical result breakdown (§10 & §Phase 14)
+router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 

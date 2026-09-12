@@ -5,7 +5,7 @@ import { score } from '../scoring';
 
 const router = Router();
 
-// GET /api/attempts - history for user (§11 My Tests)
+// GET /api/attempts - history for authenticated user (§11 My Tests)
 router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
@@ -14,7 +14,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
     const where: any = { userId };
     if (status && typeof status === 'string' && status !== 'All') {
       const clean = status.trim().toUpperCase().replace(/\s+/g, '_');
-      if (clean === 'COMPLETED' || clean === 'IN_PROGRESS') {
+      if (clean === 'COMPLETED' || clean === 'IN_PROGRESS' || clean === 'EXPIRED') {
         where.status = clean;
       }
     }
@@ -55,14 +55,18 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       unansweredCount: att.unansweredCount,
     }));
 
-    return res.json({ attempts: formatted });
+    return res.json({ success: true, attempts: formatted });
   } catch (error) {
     console.error('Error fetching attempts:', error);
-    return res.status(500).json({ error: 'Failed to retrieve test attempts.' });
+    return res.status(500).json({
+      success: false,
+      error: { code: 'FETCH_ATTEMPTS_FAILED', message: 'Failed to retrieve test attempts.' },
+    });
   }
 });
 
-// GET /api/attempts/:id - load live test engine state (§8)
+// GET /api/attempts/:id - load live test engine state (§Phase 5 & 8)
+// Strictly prevents answer keys, isCorrect, explanation, and shortcut leaks during active tests
 router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
@@ -78,12 +82,20 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
             testQuestions: {
               include: {
                 question: {
-                  include: {
-                    options: {
-                      select: { id: true, optionKey: true, optionText: true }, // Hide isCorrect during test!
-                    },
-                    topic: { select: { id: true, name: true } },
+                  select: {
+                    id: true,
+                    questionText: true,
+                    questionType: true,
+                    difficulty: true,
+                    marks: true,
+                    negativeMarks: true,
                     subject: { select: { id: true, name: true } },
+                    topic: { select: { id: true, name: true } },
+                    options: {
+                      // CRITICAL: NEVER include isCorrect during an active test session (§Phase 5)
+                      select: { id: true, optionKey: true, optionText: true },
+                    },
+                    // Notice: explanation and shortcut are deliberately EXCLUDED here!
                   },
                 },
               },
@@ -96,11 +108,18 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
     });
 
     if (!attempt) {
-      return res.status(404).json({ error: 'Attempt not found.' });
+      return res.status(404).json({
+        success: false,
+        error: { code: 'ATTEMPT_NOT_FOUND', message: 'Test attempt not found.' },
+      });
     }
 
+    // IDOR Protection: verify user ownership or admin access (§Phase 14)
     if (attempt.userId !== userId && req.user!.role !== 'ADMIN') {
-      return res.status(403).json({ error: 'Unauthorized to access this test attempt.' });
+      return res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN', message: 'Unauthorized to access this test attempt.' },
+      });
     }
 
     // User bookmarks lookup
@@ -110,16 +129,11 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
     });
     const bookmarkedSet = new Set(userBookmarks.map((b) => b.questionId));
 
-    // Calculate server-authoritative timer remaining
+    // Calculate server-authoritative timer remaining (§Phase 8)
     const totalDurationSeconds = attempt.test.duration * 60;
     const elapsedSeconds = Math.max(0, Math.floor((Date.now() - new Date(attempt.startedAt).getTime()) / 1000));
-    let remainingSeconds = Math.max(0, totalDurationSeconds - elapsedSeconds);
-
-    // If test is a practice set with no hard timer, remainingSeconds can be null or infinity
     const isPracticeMode = attempt.test.testType === 'Practice';
-    if (isPracticeMode) {
-      remainingSeconds = 999999;
-    }
+    let remainingSeconds = isPracticeMode ? 999999 : Math.max(0, totalDurationSeconds - elapsedSeconds);
 
     // Map questions with current answer state
     const answerMap = new Map(attempt.answers.map((a) => [a.questionId, a]));
@@ -147,6 +161,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
     });
 
     return res.json({
+      success: true,
       attempt: {
         id: attempt.id,
         testId: attempt.testId,
@@ -167,11 +182,14 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
     });
   } catch (error) {
     console.error('Error fetching live attempt:', error);
-    return res.status(500).json({ error: 'Failed to load test session.' });
+    return res.status(500).json({
+      success: false,
+      error: { code: 'SESSION_LOAD_FAILED', message: 'Failed to load test session.' },
+    });
   }
 });
 
-// POST /api/attempts/:id/answer - save response in real-time (§8)
+// POST /api/attempts/:id/answer - save response in real-time (§Phase 6, 7 & 8)
 router.post('/:id/answer', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
@@ -179,52 +197,82 @@ router.post('/:id/answer', authenticate, async (req: AuthRequest, res: Response)
     const { questionId, selectedOption, isMarked, timeSpent } = req.body;
 
     if (!questionId) {
-      return res.status(400).json({ error: 'Question ID is required.' });
+      return res.status(400).json({
+        success: false,
+        error: { code: 'MISSING_QUESTION_ID', message: 'Question ID is required.' },
+      });
     }
 
     const attempt = await prisma.attempt.findUnique({
       where: { id },
-      select: { id: true, userId: true, status: true },
+      include: {
+        test: { select: { duration: true, testType: true } },
+      },
     });
 
     if (!attempt) {
-      return res.status(404).json({ error: 'Attempt not found.' });
+      return res.status(404).json({
+        success: false,
+        error: { code: 'ATTEMPT_NOT_FOUND', message: 'Attempt not found.' },
+      });
     }
 
     if (attempt.userId !== userId) {
-      return res.status(403).json({ error: 'Unauthorized.' });
-    }
-
-    if (attempt.status === 'COMPLETED') {
-      return res.status(400).json({ error: 'This test has already been completed and submitted.' });
-    }
-
-    // Upsert answer in database
-    const existing = await prisma.attemptAnswer.findFirst({
-      where: { attemptId: id, questionId },
-    });
-
-    let updatedAnswer;
-    if (existing) {
-      updatedAnswer = await prisma.attemptAnswer.update({
-        where: { id: existing.id },
-        data: {
-          selectedOption: selectedOption !== undefined ? selectedOption : existing.selectedOption,
-          isMarked: isMarked !== undefined ? Boolean(isMarked) : existing.isMarked,
-          timeSpent: timeSpent !== undefined ? Math.max(0, Number(timeSpent)) : existing.timeSpent,
-        },
+      return res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN', message: 'Unauthorized to modify this test attempt.' },
       });
-    } else {
-      updatedAnswer = await prisma.attemptAnswer.create({
-        data: {
+    }
+
+    if (attempt.status === 'COMPLETED' || attempt.status === 'EXPIRED') {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'ATTEMPT_CLOSED', message: 'This test has already been completed and submitted.' },
+      });
+    }
+
+    // Server-authoritative timer check with 30-second network grace period (§Phase 8)
+    const isPracticeMode = attempt.test.testType === 'Practice';
+    const totalDurationSeconds = attempt.test.duration * 60;
+    const elapsedSeconds = (Date.now() - new Date(attempt.startedAt).getTime()) / 1000;
+    const gracePeriodSeconds = 30;
+
+    if (!isPracticeMode && elapsedSeconds > (totalDurationSeconds + gracePeriodSeconds)) {
+      await prisma.attempt.update({
+        where: { id: attempt.id },
+        data: { status: 'EXPIRED' },
+      });
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'TEST_EXPIRED',
+          message: 'The examination time limit has expired. Please submit your test.',
+        },
+        expired: true,
+      });
+    }
+
+    // Upsert answer in database using unique composite constraint
+    const updatedAnswer = await prisma.attemptAnswer.upsert({
+      where: {
+        attemptId_questionId: {
           attemptId: id,
           questionId,
-          selectedOption: selectedOption || null,
-          isMarked: Boolean(isMarked),
-          timeSpent: timeSpent ? Math.max(0, Number(timeSpent)) : 0,
         },
-      });
-    }
+      },
+      update: {
+        selectedOption: selectedOption !== undefined ? selectedOption : undefined,
+        isMarked: isMarked !== undefined ? Boolean(isMarked) : undefined,
+        timeSpent: timeSpent !== undefined ? Math.max(0, Number(timeSpent)) : undefined,
+      },
+      create: {
+        attemptId: id,
+        questionId,
+        selectedOption: selectedOption || null,
+        isMarked: Boolean(isMarked),
+        timeSpent: timeSpent ? Math.max(0, Number(timeSpent)) : 0,
+      },
+    });
 
     return res.json({
       success: true,
@@ -236,11 +284,14 @@ router.post('/:id/answer', authenticate, async (req: AuthRequest, res: Response)
     });
   } catch (error) {
     console.error('Error saving answer:', error);
-    return res.status(500).json({ error: 'Failed to record answer response.' });
+    return res.status(500).json({
+      success: false,
+      error: { code: 'ANSWER_SAVE_FAILED', message: 'Failed to record answer response.' },
+    });
   }
 });
 
-// POST /api/attempts/:id/submit - idempotent exam submission (§8 & §9)
+// POST /api/attempts/:id/submit - idempotent, transaction-safe exam submission (§Phase 6, 8 & 10)
 router.post('/:id/submit', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
@@ -265,16 +316,23 @@ router.post('/:id/submit', authenticate, async (req: AuthRequest, res: Response)
     });
 
     if (!attempt) {
-      return res.status(404).json({ error: 'Attempt not found.' });
+      return res.status(404).json({
+        success: false,
+        error: { code: 'ATTEMPT_NOT_FOUND', message: 'Attempt not found.' },
+      });
     }
 
     if (attempt.userId !== userId && req.user!.role !== 'ADMIN') {
-      return res.status(403).json({ error: 'Unauthorized.' });
+      return res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN', message: 'Unauthorized to submit this test attempt.' },
+      });
     }
 
-    // Idempotent: if already completed, return existing score directly
+    // Idempotent: if already completed, return existing score directly (§Phase 6)
     if (attempt.status === 'COMPLETED') {
       return res.json({
+        success: true,
         attemptId: attempt.id,
         score: attempt.score,
         percentage: attempt.percentage,
@@ -295,80 +353,48 @@ router.post('/:id/submit', authenticate, async (req: AuthRequest, res: Response)
     const marksPerQ = test.testQuestions[0]?.question.marks ?? 1.0;
     const negativeMarksPerQ = typeof test.negativeMarks === 'number' ? test.negativeMarks : 0.25;
 
-    // Evaluate answers
+    const answerUpdates: {
+      questionId: string;
+      selectedOption: string | null;
+      isCorrect: boolean | null;
+      marksObtained: number;
+    }[] = [];
+
+    // Evaluate answers server-side
     for (const tq of test.testQuestions) {
       const q = tq.question;
       const ans = answerMap.get(q.id);
       const correctOption = q.options.find((o) => o.isCorrect);
-
       const userSelected = ans?.selectedOption || null;
 
       if (!userSelected) {
         unansweredCount++;
-        if (ans) {
-          await prisma.attemptAnswer.update({
-            where: { id: ans.id },
-            data: { isCorrect: null, marksObtained: 0 },
-          });
-        } else {
-          await prisma.attemptAnswer.create({
-            data: {
-              attemptId: attempt.id,
-              questionId: q.id,
-              selectedOption: null,
-              isCorrect: null,
-              marksObtained: 0,
-              timeSpent: 0,
-              isMarked: false,
-            },
-          });
-        }
+        answerUpdates.push({
+          questionId: q.id,
+          selectedOption: null,
+          isCorrect: null,
+          marksObtained: 0,
+        });
       } else if (correctOption && userSelected === correctOption.optionKey) {
         correctCount++;
-        const marksObtained = q.marks;
-        if (ans) {
-          await prisma.attemptAnswer.update({
-            where: { id: ans.id },
-            data: { isCorrect: true, marksObtained },
-          });
-        } else {
-          await prisma.attemptAnswer.create({
-            data: {
-              attemptId: attempt.id,
-              questionId: q.id,
-              selectedOption: userSelected,
-              isCorrect: true,
-              marksObtained,
-              timeSpent: 0,
-              isMarked: false,
-            },
-          });
-        }
+        answerUpdates.push({
+          questionId: q.id,
+          selectedOption: userSelected,
+          isCorrect: true,
+          marksObtained: q.marks,
+        });
       } else {
         wrongCount++;
-        const marksObtained = -negativeMarksPerQ;
-        if (ans) {
-          await prisma.attemptAnswer.update({
-            where: { id: ans.id },
-            data: { isCorrect: false, marksObtained },
-          });
-        } else {
-          await prisma.attemptAnswer.create({
-            data: {
-              attemptId: attempt.id,
-              questionId: q.id,
-              selectedOption: userSelected,
-              isCorrect: false,
-              marksObtained,
-              timeSpent: 0,
-              isMarked: false,
-            },
-          });
-        }
+        answerUpdates.push({
+          questionId: q.id,
+          selectedOption: userSelected,
+          isCorrect: false,
+          marksObtained: -negativeMarksPerQ,
+        });
       }
     }
 
-    // Use single reusable, testable scoring function (§9)
+    // Centralized scoring function (§Phase 10)
     const scoreResult = score(
       correctCount,
       wrongCount,
@@ -378,23 +404,50 @@ router.post('/:id/submit', authenticate, async (req: AuthRequest, res: Response)
       test.testQuestions.length
     );
 
-    // Persist final attempt state
-    const updatedAttempt = await prisma.attempt.update({
-      where: { id: attempt.id },
-      data: {
-        status: 'COMPLETED',
-        submittedAt,
-        timeTaken,
-        score: scoreResult.score,
-        percentage: scoreResult.percentage,
-        accuracy: scoreResult.accuracy,
-        correctCount,
-        wrongCount,
-        unansweredCount,
-      },
+    // Atomically persist all answer updates and final attempt score via transaction (§Phase 11)
+    const updatedAttempt = await prisma.$transaction(async (tx) => {
+      for (const update of answerUpdates) {
+        await tx.attemptAnswer.upsert({
+          where: {
+            attemptId_questionId: {
+              attemptId: attempt.id,
+              questionId: update.questionId,
+            },
+          },
+          update: {
+            isCorrect: update.isCorrect,
+            marksObtained: update.marksObtained,
+          },
+          create: {
+            attemptId: attempt.id,
+            questionId: update.questionId,
+            selectedOption: update.selectedOption,
+            isCorrect: update.isCorrect,
+            marksObtained: update.marksObtained,
+            timeSpent: 0,
+            isMarked: false,
+          },
+        });
+      }
+
+      return tx.attempt.update({
+        where: { id: attempt.id },
+        data: {
+          status: 'COMPLETED',
+          submittedAt,
+          timeTaken,
+          score: scoreResult.score,
+          percentage: scoreResult.percentage,
+          accuracy: scoreResult.accuracy,
+          correctCount,
+          wrongCount,
+          unansweredCount,
+        },
+      });
     });
 
     return res.json({
+      success: true,
       attemptId: updatedAttempt.id,
       score: updatedAttempt.score,
       percentage: updatedAttempt.percentage,
@@ -403,7 +456,10 @@ router.post('/:id/submit', authenticate, async (req: AuthRequest, res: Response)
     });
   } catch (error) {
     console.error('Error submitting attempt:', error);
-    return res.status(500).json({ error: 'Failed to submit test.' });
+    return res.status(500).json({
+      success: false,
+      error: { code: 'SUBMISSION_FAILED', message: 'Failed to submit test.' },
+    });
   }
 });
 

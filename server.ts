@@ -21,6 +21,8 @@ import dailyChallengeRoutes from './server/routes/dailyChallenge';
 
 import {
   securityHeaders,
+  corsMiddleware,
+  noCacheHeaders,
   createRateLimiter,
   errorHandler,
 } from './server/middleware/security';
@@ -31,28 +33,16 @@ async function startServer() {
   const app = express();
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-  // Security Headers (§Phase 3)
+  // Strict CORS Middleware (§Phase 3)
+  app.use(corsMiddleware);
+
+  // Security Headers & CSP (§Phase 3)
   app.use(securityHeaders);
 
   // Global Middlewares with bounded payload size (§Phase 3)
   app.use(express.json({ limit: '2mb' }));
   app.use(express.urlencoded({ extended: true, limit: '2mb' }));
   app.use(cookieParser());
-
-  // CORS and preflight handling
-  app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-    res.header(
-      'Access-Control-Allow-Headers',
-      'Origin, X-Requested-With, Content-Type, Accept, Authorization'
-    );
-    res.header('Access-Control-Allow-Credentials', 'true');
-    if (req.method === 'OPTIONS') {
-      return res.sendStatus(200);
-    }
-    next();
-  });
 
   // Health check
   app.get('/api/health', (_req, res) => {
@@ -63,36 +53,70 @@ async function startServer() {
     });
   });
 
-  // Rate limiters for sensitive endpoints (§Phase 3)
+  // Granular Rate Limiters for sensitive endpoints (§Phase 4)
   const authRateLimiter = createRateLimiter({
-    windowMs: 60 * 1000,
-    maxRequests: 20,
-    message: 'Too many authentication attempts. Please wait 1 minute before retrying.',
+    windowMs: 15 * 60 * 1000,
+    maxRequests: 15,
+    message: 'Too many authentication attempts. Please wait a few minutes before retrying.',
   });
 
   const aiRateLimiter = createRateLimiter({
     windowMs: 60 * 1000,
-    maxRequests: 30,
-    message: 'AI Mentor rate limit exceeded. Please wait a moment before sending another query.',
+    maxRequests: 20,
+    message: 'AI Mentor rate limit reached. Please wait a moment before sending another query.',
   });
 
-  // API Routes
+  const submitRateLimiter = createRateLimiter({
+    windowMs: 10 * 60 * 1000,
+    maxRequests: 20,
+    message: 'Too many exam submission requests in a short period.',
+  });
+
+  const adminRateLimiter = createRateLimiter({
+    windowMs: 60 * 1000,
+    maxRequests: 60,
+    message: 'Admin operations rate limit exceeded.',
+  });
+
+  const reportRateLimiter = createRateLimiter({
+    windowMs: 60 * 60 * 1000,
+    maxRequests: 10,
+    message: 'Report submission rate limit reached. Thank you for your feedback.',
+  });
+
+  // Apply cache-prevention to sensitive routes
+  app.use('/api/attempts', noCacheHeaders);
+  app.use('/api/results', noCacheHeaders);
+  app.use('/api/auth', noCacheHeaders);
+
+  // API Routes with appropriate rate limiters
   app.use('/api/auth/login', authRateLimiter);
   app.use('/api/auth/register', authRateLimiter);
+  app.use('/api/auth/firebase-sync', authRateLimiter);
+  app.use('/api/auth/change-password', authRateLimiter);
   app.use('/api/auth', authRoutes);
+
   app.use('/api/exams', examsRoutes);
   app.use('/api/tests', testsRoutes);
+
+  app.use('/api/attempts/:id/submit', submitRateLimiter);
   app.use('/api/attempts', attemptsRoutes);
+
   app.use('/api/results', resultsRoutes);
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/practice', practiceRoutes);
   app.use('/api/bookmarks', bookmarksRoutes);
   app.use('/api/leaderboard', leaderboardRoutes);
-  app.use('/api/admin', adminRoutes);
+
+  app.use('/api/admin', adminRateLimiter, adminRoutes);
   app.use('/api/analytics', analyticsRoutes);
+
   app.use('/api/gemini/chat', aiRateLimiter);
   app.use('/api/gemini', geminiRoutes);
-  app.use('/api/reports', reportsRoutes);
+
+  app.use('/api/reports', reportRateLimiter, reportsRoutes);
+
+  app.use('/api/daily-challenge/submit', submitRateLimiter);
   app.use('/api/daily-challenge', dailyChallengeRoutes);
 
   // Vite middleware in dev or static files in production
