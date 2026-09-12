@@ -57,16 +57,31 @@ export const ResultPage: React.FC<{ attemptId: string }> = ({ attemptId }) => {
     async function loadResult() {
       try {
         const token = localStorage.getItem('abhi_token');
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
         const res = await fetch(`/api/results/${attemptId}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          headers,
+          credentials: 'include',
         });
 
-        if (res.ok && isMounted) {
-          const json: ResultData = await res.json();
+        let json: ResultData | null = null;
+        if (res.ok) {
+          try {
+            json = await res.json();
+          } catch {}
+        }
+
+        if (!json || !json.result) {
+          const fallback = (await import('../lib/fallbackData')).getFallbackTestResult(attemptId);
+          json = fallback;
+        }
+
+        if (json && isMounted) {
           setData(json);
 
           // Persist attempt to Firestore under user document if user is logged in
-          if (user?.id) {
+          if (user?.id && json.result) {
             persistAttemptToFirestore(user.id, {
               id: json.result.attemptId,
               userId: user.id,
@@ -108,6 +123,13 @@ export const ResultPage: React.FC<{ attemptId: string }> = ({ attemptId }) => {
         }
       } catch (err) {
         console.error('Failed to load result:', err);
+        try {
+          const fallback = (await import('../lib/fallbackData')).getFallbackTestResult(attemptId);
+          if (fallback && isMounted) {
+            setData(fallback);
+            setDisplayedScore(fallback.result?.score || 0);
+          }
+        } catch {}
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -205,7 +227,9 @@ export const ResultPage: React.FC<{ attemptId: string }> = ({ attemptId }) => {
     );
   }
 
-  const { result, subjectAnalysis, questions } = data;
+  const result = data.result;
+  const subjectAnalysis = data.subjectAnalysis || [];
+  const questions = data.questions || [];
 
   const filteredQuestions = questions.filter((q) => {
     if (activeFilter === 'CORRECT') return q.status === 'CORRECT';

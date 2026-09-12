@@ -128,11 +128,20 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
       try {
         const attempts = JSON.parse(localStorage.getItem('abhi_local_attempts') || '{}');
         if (attempts[attemptId]) {
-          return jsonResponse({ attempt: attempts[attemptId] });
+          const att = attempts[attemptId];
+          return jsonResponse({
+            success: true,
+            attempt: att,
+            questions: att.questions || [],
+          });
         }
       } catch {}
       const defaultAttempt = startFallbackTestAttempt(FALLBACK_TESTS[0]?.id || 'sbi-po-test-1');
-      return jsonResponse({ attempt: defaultAttempt });
+      return jsonResponse({
+        success: true,
+        attempt: defaultAttempt.attempt,
+        questions: defaultAttempt.questions || [],
+      });
     }
 
     // 6. /api/results

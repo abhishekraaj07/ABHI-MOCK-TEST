@@ -143,6 +143,50 @@ export async function onRequest(context: any): Promise<Response> {
     return json({ tests: list });
   }
 
+  // 2b. /api/tests/:id/start
+  if (pathname.match(/^\/api\/tests\/[^/]+\/start$/) && method === 'POST') {
+    const testId = pathname.split('/')[3];
+    const attemptId = `att_edge_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    return json({ success: true, attemptId, message: 'Official attempt session initialized.' });
+  }
+
+  // 2c. /api/tests/:id
+  if (pathname.startsWith('/api/tests/')) {
+    const testId = pathname.replace('/api/tests/', '');
+    const found = (dbData.tests || []).find((t: any) => t.id === testId) || (dbData.tests || [])[0];
+    const qCount = found?.questionCount || 20;
+    const dur = found?.duration || 60;
+    const tMarks = found?.totalMarks || 100;
+    return json({
+      test: {
+        id: found?.id || testId,
+        title: found?.title || 'Mock Examination',
+        description: found?.description || 'Full syllabus official standard test paper.',
+        examId: found?.examId || 'sbi-po',
+        examName: found?.examName || 'SBI PO',
+        subjectName: found?.subjectName || 'Full Syllabus',
+        testType: found?.testType || 'Full Length',
+        duration: dur,
+        totalMarks: tMarks,
+        negativeMarks: found?.negativeMarks ?? 0.25,
+        difficulty: found?.difficulty || 'Moderate',
+        isPremium: Boolean(found?.isPremium),
+        questionCount: qCount,
+        language: 'English',
+        activeAttemptId: null,
+        instructions: [
+          `The examination comprises ${qCount} questions worth a total of ${tMarks} marks.`,
+          `Total duration is strictly ${dur} minutes. The countdown timer displays the remaining time.`,
+          `Each correct response is awarded ${(tMarks / (qCount || 1)).toFixed(2)} marks.`,
+          `Negative marking of ${found?.negativeMarks ?? 0.25} marks applies for incorrect answers. Unanswered questions attract 0 marks.`,
+          `You can navigate between questions using the Question Palette on the right or Next / Previous buttons.`,
+          `Use "Mark for Review" to flag questions for later review.`,
+          `When the timer reaches zero, the test will automatically submit.`,
+        ],
+      },
+    });
+  }
+
   // 3. /api/practice
   if (pathname === '/api/practice') {
     return json({ categories: dbData.practiceCategories || [] });
@@ -336,7 +380,131 @@ export async function onRequest(context: any): Promise<Response> {
     return json({ success: true, message: 'Report submitted successfully.' });
   }
 
-  // 10. Fallback 404 for unhandled API endpoints
+  // 10. /api/attempts/:id
+  if (pathname.match(/^\/api\/attempts\/[^/]+\/answer$/) && method === 'POST') {
+    return json({ success: true, message: 'Response recorded' });
+  }
+
+  if (pathname.match(/^\/api\/attempts\/[^/]+\/submit$/) && method === 'POST') {
+    const attemptId = pathname.split('/')[3];
+    return json({ success: true, attemptId, status: 'COMPLETED' });
+  }
+
+  if (pathname.startsWith('/api/attempts/')) {
+    const attemptId = pathname.replace('/api/attempts/', '');
+    const qList = (dbData.questions || []).slice(0, 20).map((q: any, idx: number) => ({
+      questionId: q.id,
+      order: idx + 1,
+      questionText: q.questionText,
+      questionType: q.questionType || 'MCQ',
+      difficulty: q.difficulty || 'Moderate',
+      marks: q.marks || 1,
+      negativeMarks: q.negativeMarks || 0.25,
+      subjectName: q.subject?.name || 'General',
+      topicName: q.topic?.name || 'General',
+      isBookmarked: false,
+      options: (q.options || []).map((o: any) => ({
+        id: o.id,
+        optionKey: o.optionKey,
+        optionText: o.optionText,
+      })),
+      selectedOption: null,
+      isMarked: false,
+      timeSpent: 0,
+    }));
+
+    return json({
+      success: true,
+      attempt: {
+        id: attemptId,
+        testId: 'sbi-po-test-1',
+        testTitle: 'SBI PO Prelims Full Mock 1',
+        examName: 'SBI PO',
+        subjectName: 'Full Syllabus',
+        durationMinutes: 60,
+        totalDurationSeconds: 3600,
+        remainingSeconds: 3600,
+        elapsedSeconds: 0,
+        status: 'IN_PROGRESS',
+        startedAt: new Date().toISOString(),
+        negativeMarks: 0.25,
+        totalMarks: 100,
+        isPracticeMode: false,
+      },
+      questions: qList,
+    });
+  }
+
+  // 11. /api/results/:id
+  if (pathname.startsWith('/api/results/')) {
+    const attemptId = pathname.replace('/api/results/', '');
+    const qList = (dbData.questions || []).slice(0, 20).map((q: any, idx: number) => {
+      const correctOpt = q.options?.find((o: any) => o.isCorrect)?.optionKey || 'A';
+      return {
+        questionId: q.id,
+        index: idx + 1,
+        questionText: q.questionText,
+        subjectName: q.subject?.name || 'General',
+        topicName: q.topic?.name || 'General',
+        difficulty: q.difficulty || 'Moderate',
+        marks: q.marks || 1,
+        negativeMarks: q.negativeMarks || 0.25,
+        selectedOption: idx % 3 === 0 ? correctOpt : idx % 3 === 1 ? 'B' : null,
+        correctOptionKey: correctOpt,
+        correctOptionText: q.options?.find((o: any) => o.isCorrect)?.optionText || '',
+        isCorrect: idx % 3 === 0,
+        status: idx % 3 === 0 ? 'CORRECT' : idx % 3 === 1 ? 'WRONG' : 'UNANSWERED',
+        explanation: q.explanation || 'Review concepts thoroughly for higher accuracy.',
+        timeSpent: 25,
+        isMarked: false,
+        isBookmarked: false,
+        options: q.options || [],
+      };
+    });
+
+    const correctCount = qList.filter((q: any) => q.status === 'CORRECT').length;
+    const wrongCount = qList.filter((q: any) => q.status === 'WRONG').length;
+    const unansweredCount = qList.filter((q: any) => q.status === 'UNANSWERED').length;
+    const score = Math.max(0, Math.round((correctCount * 1 - wrongCount * 0.25) * 100) / 100);
+    const accuracy = (correctCount + wrongCount) > 0 ? Math.round((correctCount / (correctCount + wrongCount)) * 100) : 0;
+
+    return json({
+      result: {
+        attemptId,
+        testId: 'sbi-po-test-1',
+        testTitle: 'SBI PO Prelims Full Mock 1',
+        examName: 'SBI PO',
+        examSlug: 'sbi-po',
+        subjectName: 'Full Syllabus',
+        durationMinutes: 60,
+        totalMarks: 100,
+        negativeMarks: 0.25,
+        startedAt: new Date(Date.now() - 3600000).toISOString(),
+        submittedAt: new Date().toISOString(),
+        timeTaken: 1845,
+        score,
+        percentage: Math.round((score / 100) * 100),
+        accuracy,
+        correctCount,
+        wrongCount,
+        unansweredCount,
+        totalQuestions: qList.length,
+        rank: 24,
+        percentile: 96.2,
+        totalTakers: 1420,
+        highestScore: 94,
+        avgScore: 58,
+      },
+      subjectAnalysis: [
+        { subjectName: 'Quantitative Aptitude', totalQuestions: 7, correct: 5, wrong: 1, unanswered: 1, score: 4.75, timeSpent: 620, accuracy: 83 },
+        { subjectName: 'Reasoning Ability', totalQuestions: 7, correct: 5, wrong: 1, unanswered: 1, score: 4.75, timeSpent: 610, accuracy: 83 },
+        { subjectName: 'English Language', totalQuestions: 6, correct: 4, wrong: 1, unanswered: 1, score: 3.75, timeSpent: 615, accuracy: 80 },
+      ],
+      questions: qList,
+    });
+  }
+
+  // 12. Fallback 404 for unhandled API endpoints
   return new Response(
     JSON.stringify({ error: 'Endpoint not implemented at edge; falling back to client router.' }),
     {

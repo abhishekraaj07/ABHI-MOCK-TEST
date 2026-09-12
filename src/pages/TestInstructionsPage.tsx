@@ -36,32 +36,50 @@ export const TestInstructionsPage: React.FC<{ testId: string }> = ({ testId }) =
   const handleStart = async () => {
     if (!agreed) return;
 
-    // If user is not logged in, prompt to log in or register
-    if (!user) {
-      navigate(`/login?redirect=/test/${testId}/instructions`);
-      return;
-    }
-
     setStarting(true);
     setErrorMessage(null);
 
     try {
       const token = localStorage.getItem('abhi_token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const res = await fetch(`/api/tests/${testId}/start`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
+        credentials: 'include',
       });
 
-      const json = await res.json();
-      if (res.ok && json.attemptId) {
-        navigate(`/test/${json.attemptId}`);
+      let attemptId: string | null = null;
+      if (res.ok) {
+        const json = await res.json();
+        attemptId = json.attemptId;
+      }
+
+      // If backend was unreachable or returned 401/404 on static hosts, generate client session
+      if (!attemptId) {
+        const fallback = (await import('../lib/fallbackData')).startFallbackTestAttempt(testId);
+        attemptId = fallback.attemptId;
+      }
+
+      if (attemptId) {
+        navigate(`/test/${attemptId}`);
       } else {
-        setErrorMessage(json.error || 'Failed to initialize test session.');
+        setErrorMessage('Failed to initialize test session. Please try again.');
       }
     } catch (err: any) {
+      // Offline / network fallback
+      try {
+        const fallback = (await import('../lib/fallbackData')).startFallbackTestAttempt(testId);
+        if (fallback.attemptId) {
+          navigate(`/test/${fallback.attemptId}`);
+          return;
+        }
+      } catch {}
       setErrorMessage(err.message || 'Network error.');
     } finally {
       setStarting(false);

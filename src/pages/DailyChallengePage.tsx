@@ -138,11 +138,6 @@ export const DailyChallengePage: React.FC = () => {
   }, [engineState]);
 
   const startChallenge = () => {
-    const token = localStorage.getItem('abhi_token');
-    if (!token) {
-      navigate('/login?redirect=/daily-challenge');
-      return;
-    }
     setTimeLeftSeconds((data?.challenge.durationMinutes || 5) * 60);
     startTimeRef.current = Date.now();
     setEngineState('RUNNING');
@@ -158,11 +153,6 @@ export const DailyChallengePage: React.FC = () => {
 
   const handleSubmit = async () => {
     if (!data || submitting) return;
-    const token = localStorage.getItem('abhi_token');
-    if (!token) {
-      navigate('/login?redirect=/daily-challenge');
-      return;
-    }
 
     setSubmitting(true);
     const elapsedSeconds = Math.max(1, Math.round((Date.now() - startTimeRef.current) / 1000));
@@ -173,12 +163,16 @@ export const DailyChallengePage: React.FC = () => {
     }));
 
     try {
+      const token = localStorage.getItem('abhi_token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await apiFetch('/api/daily-challenge/submit', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
+        credentials: 'include',
         body: JSON.stringify({
           challengeId: data.challenge.id,
           answers: formattedAnswers,
@@ -187,11 +181,11 @@ export const DailyChallengePage: React.FC = () => {
       });
 
       const resData = await res.json();
-      if (!res.ok) {
+      if (!res.ok && !resData.success) {
         throw new Error(resData.error || 'Failed to submit challenge.');
       }
 
-      setSubmitResult(resData.result);
+      setSubmitResult(resData.result || resData);
       setEngineState('COMPLETED');
       // Reload full challenge to reveal solutions
       await fetchChallenge();

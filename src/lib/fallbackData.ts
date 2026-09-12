@@ -294,27 +294,58 @@ export function startFallbackTestAttempt(testId: string): any {
     FALLBACK_TESTS_WITH_QUESTIONS[0];
 
   const attemptId = `att_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-  const attempt = {
+
+  const activeQuestions = (testFull.questions || []).map((q: any, idx: number) => ({
+    questionId: q.id || q.questionId || `q-${idx + 1}`,
+    id: q.id || q.questionId || `q-${idx + 1}`,
+    order: q.order || idx + 1,
+    questionText: q.questionText,
+    questionType: q.questionType || 'MCQ',
+    difficulty: q.difficulty || 'Moderate',
+    marks: q.marks || 1,
+    negativeMarks: q.negativeMarks || 0.25,
+    subjectName: q.subjectName || 'General',
+    topicName: q.topicName || 'General',
+    isBookmarked: false,
+    options: (q.options || []).map((o: any) => ({
+      id: o.id,
+      optionKey: o.optionKey,
+      optionText: o.optionText,
+    })),
+    selectedOption: null,
+    isMarked: false,
+    timeSpent: 0,
+  }));
+
+  const fullAttempt = {
     id: attemptId,
     testId: testFull.id,
     testTitle: testFull.title,
-    duration: testFull.duration,
-    totalMarks: testFull.totalMarks,
-    negativeMarks: testFull.negativeMarks || 0.25,
-    startedAt: new Date().toISOString(),
+    examName: testFull.examName || 'Competitive Exam',
+    subjectName: testFull.subjectName || 'Full Syllabus',
+    durationMinutes: testFull.duration || 60,
+    totalDurationSeconds: (testFull.duration || 60) * 60,
+    remainingSeconds: (testFull.duration || 60) * 60,
+    elapsedSeconds: 0,
     status: 'IN_PROGRESS',
+    startedAt: new Date().toISOString(),
+    negativeMarks: testFull.negativeMarks || 0.25,
+    totalMarks: testFull.totalMarks || 100,
+    isPracticeMode: testFull.testType === 'Practice',
     responses: {},
-    questions: testFull.questions,
+    questions: activeQuestions,
   };
 
   try {
     const existing = JSON.parse(localStorage.getItem('abhi_local_attempts') || '{}');
-    existing[attemptId] = attempt;
+    existing[attemptId] = fullAttempt;
     localStorage.setItem('abhi_local_attempts', JSON.stringify(existing));
   } catch {}
 
   return {
+    success: true,
     attemptId,
+    attempt: fullAttempt,
     test: {
       id: testFull.id,
       title: testFull.title,
@@ -323,20 +354,7 @@ export function startFallbackTestAttempt(testId: string): any {
       negativeMarks: testFull.negativeMarks,
       difficulty: testFull.difficulty,
     },
-    questions: testFull.questions.map((q: any) => ({
-      id: q.id,
-      order: q.order,
-      questionText: q.questionText,
-      marks: q.marks,
-      negativeMarks: q.negativeMarks,
-      subjectName: q.subjectName,
-      topicName: q.topicName,
-      options: q.options.map((o: any) => ({
-        id: o.id,
-        optionKey: o.optionKey,
-        optionText: o.optionText,
-      })),
-    })),
+    questions: activeQuestions,
   };
 }
 
@@ -349,31 +367,38 @@ export function saveFallbackAttemptAnswer(
 ): any {
   try {
     const existing = JSON.parse(localStorage.getItem('abhi_local_attempts') || '{}');
-    if (existing[attemptId]) {
-      if (!existing[attemptId].responses) existing[attemptId].responses = {};
-      existing[attemptId].responses[questionId] = {
+    const attempt = existing[attemptId];
+    if (attempt) {
+      if (!attempt.responses) attempt.responses = {};
+      attempt.responses[questionId] = {
+        questionId,
         selectedOption,
         status,
-        timeSpentSeconds,
+        timeSpent: (attempt.responses[questionId]?.timeSpent || 0) + timeSpentSeconds,
         updatedAt: new Date().toISOString(),
       };
+      existing[attemptId] = attempt;
       localStorage.setItem('abhi_local_attempts', JSON.stringify(existing));
     }
   } catch {}
-
   return { success: true };
 }
 
-export function submitFallbackTestAttempt(attemptId: string, _timeSpent?: number): any {
+export function submitFallbackTestAttempt(attemptId: string, _timeSpent = 0): any {
   let attempt: any = null;
   try {
     const existing = JSON.parse(localStorage.getItem('abhi_local_attempts') || '{}');
     attempt = existing[attemptId];
   } catch {}
 
-  const testFull = attempt
-    ? FALLBACK_TESTS_WITH_QUESTIONS.find((t) => t.id === attempt.testId) || FALLBACK_TESTS_WITH_QUESTIONS[0]
-    : FALLBACK_TESTS_WITH_QUESTIONS[0];
+  const testFull =
+    FALLBACK_TESTS_WITH_QUESTIONS.find((t) => t.id === attempt?.testId) ||
+    FALLBACK_TESTS_WITH_QUESTIONS[0];
+
+  const questionsList = (attempt?.questions || testFull.questions || []).map((q: any, idx: number) => ({
+    ...q,
+    questionId: q.questionId || q.id || `q-${idx + 1}`,
+  }));
 
   const responses = attempt?.responses || {};
   let totalScore = 0;
@@ -383,107 +408,141 @@ export function submitFallbackTestAttempt(attemptId: string, _timeSpent?: number
 
   const sectionBreakdown: Record<string, any> = {};
 
-  testFull.questions.forEach((q: any) => {
+  const reviewQuestions = questionsList.map((q: any, idx: number) => {
     const subName = q.subjectName || 'General';
     if (!sectionBreakdown[subName]) {
       sectionBreakdown[subName] = {
         subjectName: subName,
         totalQuestions: 0,
-        attempted: 0,
         correct: 0,
-        incorrect: 0,
+        wrong: 0,
+        unanswered: 0,
         score: 0,
-        marks: 0,
+        timeSpent: 0,
+        accuracy: 0,
       };
     }
     sectionBreakdown[subName].totalQuestions++;
-    sectionBreakdown[subName].marks += q.marks || 1;
 
-    const userResp = responses[q.id];
-    const correctOpt = q.options.find((o: any) => o.isCorrect)?.optionKey;
+    const userResp = responses[q.questionId] || responses[q.id];
+    const correctOptionObj = q.options?.find((o: any) => o.isCorrect) || q.options?.[0];
+    const correctOpt = correctOptionObj?.optionKey || 'A';
+    const userSelected = userResp?.selectedOption || null;
 
-    if (!userResp || !userResp.selectedOption) {
+    let qStatus: 'CORRECT' | 'WRONG' | 'UNANSWERED' = 'UNANSWERED';
+    let isCorrect: boolean | null = null;
+
+    if (!userSelected) {
       unattemptedCount++;
+      sectionBreakdown[subName].unanswered++;
+    } else if (userSelected === correctOpt) {
+      correctCount++;
+      qStatus = 'CORRECT';
+      isCorrect = true;
+      const m = q.marks || 1;
+      totalScore += m;
+      sectionBreakdown[subName].correct++;
+      sectionBreakdown[subName].score += m;
     } else {
-      sectionBreakdown[subName].attempted++;
-      if (userResp.selectedOption === correctOpt) {
-        correctCount++;
-        totalScore += (q.marks || 1);
-        sectionBreakdown[subName].correct++;
-        sectionBreakdown[subName].score += (q.marks || 1);
-      } else {
-        incorrectCount++;
-        totalScore -= (q.negativeMarks || 0.25);
-        sectionBreakdown[subName].incorrect++;
-        sectionBreakdown[subName].score -= (q.negativeMarks || 0.25);
-      }
+      incorrectCount++;
+      qStatus = 'WRONG';
+      isCorrect = false;
+      const nm = q.negativeMarks || 0.25;
+      totalScore -= nm;
+      sectionBreakdown[subName].wrong++;
+      sectionBreakdown[subName].score -= nm;
     }
+
+    const tSpent = userResp?.timeSpent || 15;
+    sectionBreakdown[subName].timeSpent += tSpent;
+
+    return {
+      questionId: q.questionId,
+      index: idx + 1,
+      questionText: q.questionText,
+      subjectName: subName,
+      topicName: q.topicName || 'General',
+      difficulty: q.difficulty || 'Moderate',
+      marks: q.marks || 1,
+      negativeMarks: q.negativeMarks || 0.25,
+      selectedOption: userSelected,
+      correctOptionKey: correctOpt,
+      correctOptionText: correctOptionObj?.optionText || '',
+      isCorrect,
+      status: qStatus,
+      explanation: q.explanation || 'Review concepts thoroughly for better conceptual clarity.',
+      timeSpent: tSpent,
+      isMarked: Boolean(userResp?.isMarked),
+      isBookmarked: false,
+      options: q.options || [],
+    };
   });
 
-  const accuracy = (correctCount + incorrectCount) > 0
-    ? Math.round((correctCount / (correctCount + incorrectCount)) * 100)
-    : 0;
-
+  const attemptedTotal = correctCount + incorrectCount;
+  const accuracy = attemptedTotal > 0 ? Math.round((correctCount / attemptedTotal) * 100) : 0;
   const finalScore = Math.max(0, Math.round(totalScore * 100) / 100);
-  const percentile = Math.min(99.4, Math.max(45, Math.round((finalScore / (testFull.totalMarks || 100)) * 100 * 1.05)));
+  const totalMarks = testFull.totalMarks || 100;
+  const percentage = Math.round((finalScore / totalMarks) * 100);
+  const percentile = Math.min(99.4, Math.max(45, Math.round((percentage * 1.05) * 10) / 10));
 
-  const result = {
-    attemptId,
-    testId: testFull.id,
-    testTitle: testFull.title,
-    examName: testFull.examName,
-    score: finalScore,
-    totalMarks: testFull.totalMarks,
-    accuracy,
-    percentile,
-    rank: Math.floor(Math.random() * 40) + 12,
-    totalCandidates: 1420,
-    correctCount,
-    incorrectCount,
-    unattemptedCount,
-    sections: Object.values(sectionBreakdown),
-    completedAt: new Date().toISOString(),
+  // Compute accuracy for sections
+  Object.values(sectionBreakdown).forEach((sec: any) => {
+    const secAttempted = sec.correct + sec.wrong;
+    sec.accuracy = secAttempted > 0 ? Math.round((sec.correct / secAttempted) * 100) : 0;
+    sec.score = Math.round(sec.score * 100) / 100;
+  });
+
+  const wrongCount = incorrectCount;
+  const unansweredCount = unattemptedCount;
+
+  const fullResult = {
+    result: {
+      attemptId,
+      testId: testFull.id,
+      testTitle: testFull.title,
+      examName: testFull.examName || 'Competitive Exam',
+      examSlug: testFull.examSlug || 'sbi-po',
+      subjectName: testFull.subjectName || 'Full Syllabus',
+      durationMinutes: testFull.duration || 60,
+      totalMarks,
+      negativeMarks: testFull.negativeMarks || 0.25,
+      startedAt: attempt?.startedAt || new Date(Date.now() - 3600000).toISOString(),
+      submittedAt: new Date().toISOString(),
+      timeTaken: Math.min(testFull.duration * 60, 1800),
+      score: finalScore,
+      percentage,
+      accuracy,
+      correctCount,
+      wrongCount,
+      unansweredCount,
+      totalQuestions: questionsList.length,
+      rank: Math.floor(Math.random() * 30) + 10,
+      percentile,
+      totalTakers: 1420,
+      highestScore: Math.round(totalMarks * 0.94),
+      avgScore: Math.round(totalMarks * 0.58),
+    },
+    subjectAnalysis: Object.values(sectionBreakdown),
+    questions: reviewQuestions,
   };
 
   try {
     const results = JSON.parse(localStorage.getItem('abhi_local_results') || '{}');
-    results[attemptId] = result;
+    results[attemptId] = fullResult;
     localStorage.setItem('abhi_local_results', JSON.stringify(results));
   } catch {}
 
-  return { result };
+  return fullResult;
 }
 
 export function getFallbackTestResult(attemptId: string): any {
   try {
     const results = JSON.parse(localStorage.getItem('abhi_local_results') || '{}');
     if (results[attemptId]) {
-      return { result: results[attemptId] };
+      return results[attemptId];
     }
   } catch {}
 
-  // Fallback demo result
-  return {
-    result: {
-      attemptId,
-      testId: FALLBACK_TESTS[0]?.id || 'default-test',
-      testTitle: FALLBACK_TESTS[0]?.title || 'SBI PO Prelims Mock 1',
-      examName: 'SBI PO',
-      score: 68.5,
-      totalMarks: 100,
-      accuracy: 86,
-      percentile: 94.2,
-      rank: 42,
-      totalCandidates: 2850,
-      correctCount: 16,
-      incorrectCount: 3,
-      unattemptedCount: 1,
-      sections: [
-        { subjectName: 'Quantitative Aptitude', totalQuestions: 7, attempted: 6, correct: 5, incorrect: 1, score: 4.75, marks: 7 },
-        { subjectName: 'Reasoning Ability', totalQuestions: 7, attempted: 7, correct: 6, incorrect: 1, score: 5.75, marks: 7 },
-        { subjectName: 'English Language', totalQuestions: 6, attempted: 6, correct: 5, incorrect: 1, score: 4.75, marks: 6 },
-      ],
-      completedAt: new Date().toISOString(),
-    },
-  };
+  // Generate a realistic full result
+  return submitFallbackTestAttempt(attemptId);
 }

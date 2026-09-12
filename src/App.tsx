@@ -6,6 +6,7 @@ import { RouterProvider, useRouter } from './contexts/RouterContext';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { Spinner } from './components/Spinner';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Lazy-loaded pages
 const LandingPage = React.lazy(() => import('./pages/LandingPage'));
@@ -55,7 +56,9 @@ const AppContent: React.FC = () => {
     if (currentPath === '/practice') return <PracticePage />;
     if (currentPath === '/bookmarks') return <BookmarksPage />;
     if (currentPath === '/wrong-questions' || currentPath === '/notebook') return <WrongQuestionsPage />;
-    if (currentPath === '/daily-challenge' || currentPath === '/daily') return <DailyChallengePage />;
+    if (currentPath === '/daily-challenge' || currentPath === '/daily' || currentPath === '/daily-challenge/quiz') {
+      return <DailyChallengePage />;
+    }
     if (currentPath === '/custom-test' || currentPath === '/create-test') return <CustomTestBuilderPage />;
     if (currentPath === '/mentor' || currentPath === '/ai-tutor') return <MentorPage />;
     if (currentPath === '/leaderboard') return <LeaderboardPage />;
@@ -120,28 +123,37 @@ const AppContent: React.FC = () => {
   };
 
   // Live examination is rendered in dedicated distraction-free canvas without default navbar/footer
+  // Protected with Suspense fallback and ErrorBoundary to prevent blank screens during lazy-load
   if (isLiveTest) {
-    return renderRoute();
+    return (
+      <ErrorBoundary fallbackTitle="Live Examination Session">
+        <Suspense fallback={<Spinner />}>
+          {renderRoute()}
+        </Suspense>
+      </ErrorBoundary>
+    );
   }
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--paper)] text-[var(--ink)] antialiased transition-colors duration-200">
       <Navbar />
       <main className="flex-1">
-        <AnimatePresence mode="wait">
-          <Suspense fallback={<Spinner />}>
-            <motion.div
-              key={currentPath}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-              className="w-full"
-            >
-              {renderRoute()}
-            </motion.div>
-          </Suspense>
-        </AnimatePresence>
+        <ErrorBoundary fallbackTitle="Portal Navigation Error">
+          <AnimatePresence mode="wait">
+            <Suspense fallback={<Spinner />}>
+              <motion.div
+                key={currentPath}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
+                className="w-full"
+              >
+                {renderRoute()}
+              </motion.div>
+            </Suspense>
+          </AnimatePresence>
+        </ErrorBoundary>
       </main>
       <Footer />
     </div>
@@ -150,12 +162,14 @@ const AppContent: React.FC = () => {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <RouterProvider>
-          <AppContent />
-        </RouterProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <ErrorBoundary fallbackTitle="Application Portal Error">
+      <ThemeProvider>
+        <AuthProvider>
+          <RouterProvider>
+            <AppContent />
+          </RouterProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

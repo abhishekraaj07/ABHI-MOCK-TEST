@@ -70,24 +70,88 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
     async function loadAttempt() {
       try {
         const token = localStorage.getItem('abhi_token');
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
         const res = await fetch(`/api/attempts/${attemptId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers,
+          credentials: 'include',
         });
 
-        if (!res.ok) {
-          const errData = await res.json();
-          setErrorMessage(errData.error || 'Failed to load test attempt.');
-          setLoading(false);
-          return;
+        let json: any = null;
+        if (res.ok) {
+          try {
+            json = await res.json();
+          } catch {}
         }
 
-        const json: LiveAttemptState = await res.json();
-        setData(json);
+        // If backend attempt not found, look up local attempt or fallback
+        if (!json || (!json.attempt && !json.test)) {
+          try {
+            const localAttempts = JSON.parse(localStorage.getItem('abhi_local_attempts') || '{}');
+            if (localAttempts[attemptId]) {
+              json = {
+                attempt: localAttempts[attemptId],
+                questions: localAttempts[attemptId].questions || [],
+              };
+            }
+          } catch {}
+
+          if (!json || (!json.attempt && !json.test)) {
+            const fallback = (await import('../lib/fallbackData')).startFallbackTestAttempt('sbi-po-test-1');
+            json = {
+              attempt: fallback.attempt,
+              questions: fallback.questions,
+            };
+          }
+        }
+
+        const rawQuestions = json.questions || (json.attempt as any)?.questions || [];
+        const normalizedQuestions: ActiveQuestion[] = rawQuestions.map((q: any, idx: number) => ({
+          questionId: q.questionId || q.id || `q-${idx + 1}`,
+          order: q.order || idx + 1,
+          questionText: q.questionText || 'Question text unavailable.',
+          questionType: q.questionType || 'MCQ',
+          difficulty: q.difficulty || 'Moderate',
+          marks: q.marks || 1,
+          negativeMarks: q.negativeMarks || 0.25,
+          subjectName: q.subjectName || q.subject?.name || 'General',
+          topicName: q.topicName || q.topic?.name || 'General',
+          isBookmarked: Boolean(q.isBookmarked),
+          options: (q.options || []).map((o: any) => ({
+            id: o.id,
+            optionKey: o.optionKey,
+            optionText: o.optionText,
+          })),
+          selectedOption: q.selectedOption || null,
+          isMarked: Boolean(q.isMarked),
+          timeSpent: q.timeSpent || 0,
+        }));
+
+        const normalizedAttempt = json.attempt || json.test || {
+          id: attemptId,
+          testId: 'sbi-po-test-1',
+          testTitle: 'Live Mock Examination',
+          examName: 'SBI PO',
+          subjectName: 'Full Syllabus',
+          durationMinutes: 60,
+          totalDurationSeconds: 3600,
+          remainingSeconds: 3600,
+          elapsedSeconds: 0,
+          status: 'IN_PROGRESS',
+          startedAt: new Date().toISOString(),
+          negativeMarks: 0.25,
+          totalMarks: 100,
+          isPracticeMode: false,
+        };
+
+        setData({
+          attempt: normalizedAttempt,
+          questions: normalizedQuestions,
+        });
 
         // If already completed, redirect directly to result!
-        if (json.attempt.status === 'COMPLETED') {
+        if (normalizedAttempt.status === 'COMPLETED') {
           navigate(`/result/${attemptId}`);
           return;
         }
@@ -99,7 +163,7 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
         >();
         const bSet = new Set<string>();
 
-        json.questions.forEach((q, idx) => {
+        normalizedQuestions.forEach((q, idx) => {
           answersMap.set(q.questionId, {
             selectedOption: q.selectedOption,
             isMarked: q.isMarked,
@@ -478,32 +542,51 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
   };
 
   // Submit test (Idempotent submission §8 & §9)
-  const handleFinalSubmit = async (auto = false) => {
+  const handleFinalSubmit = async (_auto = false) => {
     setSubmitting(true);
     await flushPendingSave();
     try {
       const token = localStorage.getItem('abhi_token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch(`/api/attempts/${attemptId}/submit`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
+        credentials: 'include',
       });
 
       if (res.ok) {
         try {
           localStorage.removeItem(`abhi_attempt_draft_${attemptId}`);
-        } catch {
-          // Ignore
-        }
+        } catch {}
         navigate(`/result/${attemptId}`);
-      } else {
-        const json = await res.json();
-        alert(json.error || 'Failed to submit test. Please check connection.');
-        setSubmitting(false);
+        return;
       }
+
+      // If backend was unreachable or returned error on static host, calculate client fallback result
+      const fallback = (await import('../lib/fallbackData')).submitFallbackTestAttempt(attemptId);
+      if (fallback) {
+        try {
+          localStorage.removeItem(`abhi_attempt_draft_${attemptId}`);
+        } catch {}
+        navigate(`/result/${attemptId}`);
+        return;
+      }
+
+      const json = await res.json();
+      alert(json.error || 'Failed to submit test. Please check connection.');
+      setSubmitting(false);
     } catch (err) {
+      try {
+        const fallback = (await import('../lib/fallbackData')).submitFallbackTestAttempt(attemptId);
+        if (fallback) {
+          navigate(`/result/${attemptId}`);
+          return;
+        }
+      } catch {}
       alert('Network error while submitting. Please retry.');
       setSubmitting(false);
     }
