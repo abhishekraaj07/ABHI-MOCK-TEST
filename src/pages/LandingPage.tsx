@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import '../styles/heroAnimation.css';
 import { Link } from '../contexts/RouterContext';
 import { Exam } from '../types';
 import { PaletteLegend } from '../components/PaletteLegend';

@@ -1,39 +1,40 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { RouterProvider, useRouter } from './contexts/RouterContext';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
+import { Spinner } from './components/Spinner';
 
-// Pages
-import { LandingPage } from './pages/LandingPage';
-import { ExamsPage } from './pages/ExamsPage';
-import { ExamDetailPage } from './pages/ExamDetailPage';
-import { MockTestsPage } from './pages/MockTestsPage';
-import { TestInstructionsPage } from './pages/TestInstructionsPage';
-import { LiveTestEnginePage } from './pages/LiveTestEnginePage';
-import { ResultPage } from './pages/ResultPage';
-import { DashboardPage } from './pages/DashboardPage';
-import { MyTestsPage } from './pages/MyTestsPage';
-import { PracticePage } from './pages/PracticePage';
-import { TopicPracticePage } from './pages/TopicPracticePage';
-import { BookmarksPage } from './pages/BookmarksPage';
-import { LeaderboardPage } from './pages/LeaderboardPage';
-import { ProfilePage } from './pages/ProfilePage';
-import { AuthPage } from './pages/AuthPage';
-import { AdminPage } from './pages/AdminPage';
-import { AboutPage } from './pages/AboutPage';
-import { FaqPage } from './pages/FaqPage';
-import { ContactPage } from './pages/ContactPage';
-import { PrivacyPage } from './pages/PrivacyPage';
-import { TermsPage } from './pages/TermsPage';
-import { AnalyticsPage } from './pages/AnalyticsPage';
-import { SettingsPage } from './pages/SettingsPage';
-import { MentorPage } from './pages/MentorPage';
-import { WrongQuestionsPage } from './pages/WrongQuestionsPage';
-import { DailyChallengePage } from './pages/DailyChallengePage';
-import { CustomTestBuilderPage } from './pages/CustomTestBuilderPage';
+// Lazy-loaded pages
+const LandingPage = React.lazy(() => import('./pages/LandingPage'));
+const ExamsPage = React.lazy(() => import('./pages/ExamsPage'));
+const ExamDetailPage = React.lazy(() => import('./pages/ExamDetailPage'));
+const MockTestsPage = React.lazy(() => import('./pages/MockTestsPage'));
+const TestInstructionsPage = React.lazy(() => import('./pages/TestInstructionsPage'));
+const LiveTestEnginePage = React.lazy(() => import('./pages/LiveTestEnginePage'));
+const ResultPage = React.lazy(() => import('./pages/ResultPage'));
+const DashboardPage = React.lazy(() => import('./pages/DashboardPage'));
+const MyTestsPage = React.lazy(() => import('./pages/MyTestsPage'));
+const PracticePage = React.lazy(() => import('./pages/PracticePage'));
+const TopicPracticePage = React.lazy(() => import('./pages/TopicPracticePage'));
+const BookmarksPage = React.lazy(() => import('./pages/BookmarksPage'));
+const LeaderboardPage = React.lazy(() => import('./pages/LeaderboardPage'));
+const ProfilePage = React.lazy(() => import('./pages/ProfilePage'));
+const AuthPage = React.lazy(() => import('./pages/AuthPage'));
+const AdminPage = React.lazy(() => import('./pages/AdminPage'));
+const AboutPage = React.lazy(() => import('./pages/AboutPage'));
+const FaqPage = React.lazy(() => import('./pages/FaqPage'));
+const ContactPage = React.lazy(() => import('./pages/ContactPage'));
+const PrivacyPage = React.lazy(() => import('./pages/PrivacyPage'));
+const TermsPage = React.lazy(() => import('./pages/TermsPage'));
+const AnalyticsPage = React.lazy(() => import('./pages/AnalyticsPage'));
+const SettingsPage = React.lazy(() => import('./pages/SettingsPage'));
+const MentorPage = React.lazy(() => import('./pages/MentorPage'));
+const WrongQuestionsPage = React.lazy(() => import('./pages/WrongQuestionsPage'));
+const DailyChallengePage = React.lazy(() => import('./pages/DailyChallengePage'));
+const CustomTestBuilderPage = React.lazy(() => import('./pages/CustomTestBuilderPage'));
 
 const AppContent: React.FC = () => {
   const { path, currentPath: rawCurrentPath } = useRouter();
@@ -128,16 +129,18 @@ const AppContent: React.FC = () => {
       <Navbar />
       <main className="flex-1">
         <AnimatePresence mode="wait">
-          <motion.div
-            key={currentPath}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
-            className="w-full"
-          >
-            {renderRoute()}
-          </motion.div>
+          <Suspense fallback={<Spinner />}>
+            <motion.div
+              key={currentPath}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              className="w-full"
+            >
+              {renderRoute()}
+            </motion.div>
+          </Suspense>
         </AnimatePresence>
       </main>
       <Footer />
