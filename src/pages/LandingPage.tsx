@@ -164,7 +164,7 @@ export const LandingPage: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen">
       {/* 1. HERO SECTION (§4) */}
-      <section className="border-b border-[var(--line)] bg-[var(--surface)] py-16 sm:py-20">
+      <section className="hero-anim border-b border-[var(--line)] bg-[var(--surface)] py-16 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             {/* Left Copy Column */}
