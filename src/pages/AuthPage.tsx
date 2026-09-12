@@ -59,17 +59,17 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
     }
   };
 
-  // Quick 1-click Demo Fill
+  // Quick 1-click Demo Fill (email only — never ship passwords in client bundles)
   const fillStudent = () => {
     setIsLogin(true);
     setEmail('student@abhimocktest.com');
-    setPassword('Student123!');
+    setPassword('');
   };
 
   const fillAdmin = () => {
     setIsLogin(true);
     setEmail('admin@abhimocktest.com');
-    setPassword('AdminPassword@123');
+    setPassword('');
   };
 
   return (
@@ -289,3 +289,5 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
     </div>
   );
 };
+
+export default AuthPage;

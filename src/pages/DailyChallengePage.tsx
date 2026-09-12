@@ -640,3 +640,5 @@ export const DailyChallengePage: React.FC = () => {
     </div>
   );
 };
+
+export default DailyChallengePage;

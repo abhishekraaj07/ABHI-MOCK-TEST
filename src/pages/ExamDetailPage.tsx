@@ -218,3 +218,5 @@ export const ExamDetailPage: React.FC<{ examSlugOrId?: string; slug?: string }> 
     </div>
   );
 };
+
+export default ExamDetailPage;

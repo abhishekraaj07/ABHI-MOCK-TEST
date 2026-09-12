@@ -1119,3 +1119,5 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
     </div>
   );
 };
+
+export default LiveTestEnginePage;

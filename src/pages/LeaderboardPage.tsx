@@ -169,3 +169,5 @@ export const LeaderboardPage: React.FC = () => {
     </div>
   );
 };
+
+export default LeaderboardPage;

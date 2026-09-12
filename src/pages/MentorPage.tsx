@@ -151,3 +151,5 @@ export const MentorPage: React.FC = () => {
     </div>
   );
 };
+
+export default MentorPage;

@@ -651,3 +651,5 @@ export const WrongQuestionsPage: React.FC = () => {
     </div>
   );
 };
+
+export default WrongQuestionsPage;

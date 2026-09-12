@@ -73,8 +73,22 @@ export default defineConfig(() => {
       },
     },
     build: {
-      minify: 'esbuild',
+      minify: 'esbuild' as const,
       target: 'es2022',
+      rollupOptions: {
+        output: {
+          manualChunks(id: string) {
+            if (id.includes('node_modules')) {
+              if (id.includes('/react-dom/') || id.includes('/react/')) return 'vendor-react';
+              if (id.includes('/firebase/')) return 'vendor-firebase';
+              if (id.includes('/recharts/') || id.includes('/d3-')) return 'vendor-charts';
+              if (id.includes('/motion/')) return 'vendor-motion';
+              if (id.includes('/lucide-react/')) return 'vendor-icons';
+              if (id.includes('/react-markdown/') || id.includes('/remark-') || id.includes('/rehype-') || id.includes('/mdast-') || id.includes('/micromark')) return 'vendor-markdown';
+            }
+          },
+        },
+      },
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.

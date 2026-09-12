@@ -332,3 +332,5 @@ export const CustomTestBuilderPage: React.FC = () => {
     </div>
   );
 };
+
+export default CustomTestBuilderPage;

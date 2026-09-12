@@ -212,3 +212,5 @@ export const ExamsPage: React.FC = () => {
     </div>
   );
 };
+
+export default ExamsPage;

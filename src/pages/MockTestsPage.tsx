@@ -270,3 +270,5 @@ export const MockTestsPage: React.FC = () => {
     </div>
   );
 };
+
+export default MockTestsPage;

@@ -139,7 +139,7 @@ export function corsMiddleware(req: Request, res: Response, next: NextFunction) 
 
   const origin = req.headers.origin;
 
-  if (origin && (allowedOrigins.includes(origin) || origin.endsWith('.pages.dev'))) {
+  if (origin && allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader(

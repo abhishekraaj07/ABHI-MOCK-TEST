@@ -13,7 +13,24 @@ export interface AuthRequest extends Request {
   user?: AuthUser;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'abhi-mock-test-secret-key-2026';
+import crypto from 'crypto';
+
+function resolveJwtSecret(): string {
+  const envSecret = process.env.JWT_SECRET;
+  if (envSecret && envSecret !== 'your_secure_random_jwt_secret_key_here') {
+    return envSecret;
+  }
+  if (process.env.NODE_ENV === 'production') {
+    console.error('FATAL: JWT_SECRET environment variable is required in production.');
+    process.exit(1);
+  }
+  // Development only: generate a random per-session secret
+  const devSecret = crypto.randomBytes(32).toString('hex');
+  console.warn('WARNING: No JWT_SECRET set. Using random per-session secret (dev only). Sessions will not survive restarts.');
+  return devSecret;
+}
+
+const JWT_SECRET = resolveJwtSecret();
 
 export const AUTH_COOKIE_NAME = 'token';
 export const AUTH_COOKIE_OPTIONS = {

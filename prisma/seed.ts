@@ -11,7 +11,11 @@ async function main() {
 
   // 1. Admin & Test User
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@abhimocktest.com';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'AdminPassword@123';
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminPassword) {
+    console.error('ERROR: ADMIN_PASSWORD environment variable is required for seeding.');
+    process.exit(1);
+  }
   const adminPasswordHash = await bcrypt.hash(adminPassword, 10);
 
   const adminUser = await prisma.user.upsert({

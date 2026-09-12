@@ -157,3 +157,5 @@ export const MyTestsPage: React.FC = () => {
     </div>
   );
 };
+
+export default MyTestsPage;

@@ -733,3 +733,5 @@ export const ResultPage: React.FC<{ attemptId: string }> = ({ attemptId }) => {
     </div>
   );
 };
+
+export default ResultPage;

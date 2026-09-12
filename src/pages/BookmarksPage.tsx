@@ -372,3 +372,5 @@ export const BookmarksPage: React.FC = () => {
     </div>
   );
 };
+
+export default BookmarksPage;

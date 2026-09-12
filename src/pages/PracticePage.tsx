@@ -78,3 +78,5 @@ export const PracticePage: React.FC = () => {
     </div>
   );
 };
+
+export default PracticePage;

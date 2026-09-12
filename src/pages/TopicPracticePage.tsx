@@ -247,3 +247,5 @@ export const TopicPracticePage: React.FC<{ topicId: string }> = ({ topicId }) =>
     </div>
   );
 };
+
+export default TopicPracticePage;

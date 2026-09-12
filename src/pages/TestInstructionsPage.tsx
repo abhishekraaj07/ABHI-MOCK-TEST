@@ -238,3 +238,5 @@ export const TestInstructionsPage: React.FC<{ testId: string }> = ({ testId }) =
     </div>
   );
 };
+
+export default TestInstructionsPage;

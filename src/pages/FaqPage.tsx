@@ -172,3 +172,5 @@ export const FaqPage: React.FC = () => {
     </div>
   );
 };
+
+export default FaqPage;
