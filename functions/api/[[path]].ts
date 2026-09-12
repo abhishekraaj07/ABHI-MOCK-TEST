@@ -264,6 +264,84 @@ export async function onRequest(context: any): Promise<Response> {
     });
   }
 
-  // 5. Default JSON for unknown /api/*
-  return json({ success: true, message: 'ABHI MOCK TEST Cloudflare Pages Edge Function' });
+  // 5. /api/leaderboard
+  if (pathname === '/api/leaderboard') {
+    return json({
+      leaderboard: [
+        { rank: 1, name: 'Ananya Sharma', score: 94.5, accuracy: 96, percentile: 99.8, avatar: 'AS' },
+        { rank: 2, name: 'Rohan Verma', score: 91.0, accuracy: 93, percentile: 99.2, avatar: 'RV' },
+        { rank: 3, name: 'Priya Patel', score: 88.75, accuracy: 91, percentile: 98.7, avatar: 'PP' },
+        { rank: 4, name: 'Amit Kumar', score: 86.25, accuracy: 89, percentile: 97.9, avatar: 'AK' },
+        { rank: 5, name: 'Sneha Roy', score: 84.5, accuracy: 88, percentile: 96.5, avatar: 'SR' },
+        { rank: 6, name: 'You', score: 78.5, accuracy: 84, percentile: 92.1, avatar: 'ME', isUser: true },
+      ],
+    });
+  }
+
+  // 6. /api/analytics
+  if (pathname === '/api/analytics/wrong-questions') {
+    const wrongQs = (dbData.questions || []).slice(0, 6).map((q: any) => ({
+      id: q.id,
+      questionText: q.questionText,
+      subjectName: q.subject?.name || 'General',
+      topicName: q.topic?.name || 'Topic Drill',
+      difficulty: q.difficulty || 'Moderate',
+      options: q.options || [],
+      correctOption: q.options?.find((o: any) => o.isCorrect)?.optionKey || 'A',
+      selectedOption: 'B',
+      explanation: q.explanation || 'Review concepts thoroughly.',
+      testTitle: 'SBI PO Full Mock 1',
+    }));
+    return json({ wrongQuestions: wrongQs });
+  }
+
+  if (pathname.startsWith('/api/analytics')) {
+    return json({
+      overview: {
+        testsAttempted: 14,
+        avgScore: 72.4,
+        avgAccuracy: 84.6,
+        totalTimeHours: 18.5,
+        percentile: 88.3,
+      },
+      weakAreas: [
+        { subject: 'Quantitative Aptitude', topic: 'Data Interpretation', accuracy: 52 },
+        { subject: 'Reasoning Ability', topic: 'Floor & Flat Puzzles', accuracy: 58 },
+        { subject: 'English Language', topic: 'Sentence Rearrangement', accuracy: 64 },
+      ],
+    });
+  }
+
+  // 7. /api/dashboard
+  if (pathname === '/api/dashboard') {
+    return json({
+      stats: {
+        totalExams: EXAMS.length,
+        totalTests: (dbData.tests || []).length,
+        totalQuestions: (dbData.questions || []).length,
+        availabilityRate: '99.9%',
+      },
+      recentAttempts: [],
+      recommendedTests: (dbData.tests || []).slice(0, 4),
+    });
+  }
+
+  // 8. /api/bookmarks
+  if (pathname === '/api/bookmarks') {
+    return json({ bookmarks: [] });
+  }
+
+  // 9. /api/reports
+  if (pathname === '/api/reports' && method === 'POST') {
+    return json({ success: true, message: 'Report submitted successfully.' });
+  }
+
+  // 10. Fallback 404 for unhandled API endpoints
+  return new Response(
+    JSON.stringify({ error: 'Endpoint not implemented at edge; falling back to client router.' }),
+    {
+      status: 404,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    }
+  );
 }
