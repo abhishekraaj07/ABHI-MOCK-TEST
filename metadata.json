@@ -1,0 +1,6 @@
+{
+  "name": "ABHI MOCK TEST",
+  "description": "Full-stack mock test platform for Indian competitive exams with realistic test engine, detailed analytics, and weak-area analysis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

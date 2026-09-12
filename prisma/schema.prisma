@@ -1,0 +1,223 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                     String                  @id @default(uuid())
+  name                   String
+  email                  String                  @unique
+  passwordHash           String
+  role                   String                  @default("USER") // USER, ADMIN
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  attempts               Attempt[]
+  bookmarks              Bookmark[]
+  reports                QuestionReport[]
+  dailyChallengeAttempts DailyChallengeAttempt[]
+}
+
+model Exam {
+  id          String     @id @default(uuid())
+  name        String
+  slug        String     @unique
+  description String
+  category    String     // Banking, SSC, Railways, Regulatory
+  difficulty  String     // Easy, Moderate, Hard
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  subjects    Subject[]
+  tests       Test[]
+  questions   Question[]
+}
+
+model Subject {
+  id          String     @id @default(uuid())
+  examId      String
+  exam        Exam       @relation(fields: [examId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  topics      Topic[]
+  tests       Test[]
+  questions   Question[]
+}
+
+model Topic {
+  id          String     @id @default(uuid())
+  subjectId   String
+  subject     Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  questions   Question[]
+}
+
+model Test {
+  id            String         @id @default(uuid())
+  examId        String
+  exam          Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)
+  subjectId     String?
+  subject       Subject?       @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  title         String
+  description   String?
+  testType      String         // Full Length, Sectional, Practice, Previous Year, Custom
+  duration      Int            // in minutes
+  totalMarks    Float
+  negativeMarks Float          @default(0.25)
+  difficulty    String         // Easy, Moderate, Hard
+  isPremium     Boolean        @default(false)
+  isPublished   Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  testQuestions TestQuestion[]
+  attempts      Attempt[]
+}
+
+model Question {
+  id                      String                   @id @default(uuid())
+  examId                  String
+  exam                    Exam                     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  subjectId               String
+  subject                 Subject                  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  topicId                 String?
+  topic                   Topic?                   @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  questionText            String
+  questionType            String                   @default("MCQ") // MCQ
+  difficulty              String                   // Easy, Moderate, Hard
+  marks                   Float                    @default(1.0)
+  negativeMarks           Float                    @default(0.25)
+  explanation             String?
+  shortcut                String?
+  options                 Option[]
+  testQuestions           TestQuestion[]
+  attemptAnswers          AttemptAnswer[]
+  bookmarks               Bookmark[]
+  reports                 QuestionReport[]
+  dailyChallengeQuestions DailyChallengeQuestion[]
+}
+
+model Option {
+  id         String   @id @default(uuid())
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  optionText String
+  optionKey  String   // A, B, C, D
+  isCorrect  Boolean  @default(false)
+}
+
+model TestQuestion {
+  id            String   @id @default(uuid())
+  testId        String
+  test          Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  questionId    String
+  question      Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  questionOrder Int      @default(1)
+}
+
+model Attempt {
+  id               String          @id @default(uuid())
+  userId           String
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  testId           String
+  test             Test            @relation(fields: [testId], references: [id], onDelete: Cascade)
+  status           String          @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED
+  startedAt        DateTime        @default(now())
+  submittedAt      DateTime?
+  timeTaken        Int             @default(0) // in seconds
+  score            Float           @default(0)
+  percentage       Float           @default(0)
+  accuracy         Float           @default(0)
+  correctCount     Int             @default(0)
+  wrongCount       Int             @default(0)
+  unansweredCount  Int             @default(0)
+  answers          AttemptAnswer[]
+
+  @@index([userId, status])
+  @@index([testId, status])
+}
+
+model AttemptAnswer {
+  id             String    @id @default(uuid())
+  attemptId      String
+  attempt        Attempt   @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId     String
+  question       Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedOption String?   // "A", "B", "C", "D" or null
+  isCorrect      Boolean?
+  marksObtained  Float     @default(0)
+  timeSpent      Int       @default(0) // seconds
+  isMarked       Boolean   @default(false)
+
+  @@index([attemptId])
+  @@index([questionId])
+}
+
+model Bookmark {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, questionId])
+  @@index([userId])
+}
+
+model QuestionReport {
+  id          String    @id @default(uuid())
+  questionId  String
+  question    Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  testId      String?
+  reason      String    // wrong_question, wrong_answer, typo, unclear_question, technical_issue
+  description String
+  status      String    @default("PENDING") // PENDING, RESOLVED, REJECTED
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([questionId])
+  @@index([userId])
+  @@index([status])
+}
+
+model DailyChallenge {
+  id          String                    @id @default(uuid())
+  date        String                    @unique // YYYY-MM-DD
+  title       String
+  description String?
+  duration    Int                       @default(10) // minutes
+  createdAt   DateTime                  @default(now())
+  questions   DailyChallengeQuestion[]
+  attempts    DailyChallengeAttempt[]
+}
+
+model DailyChallengeQuestion {
+  id          String         @id @default(uuid())
+  challengeId String
+  challenge   DailyChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  questionId  String
+  question    Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  order       Int            @default(1)
+
+  @@unique([challengeId, questionId])
+}
+
+model DailyChallengeAttempt {
+  id          String         @id @default(uuid())
+  challengeId String
+  challenge   DailyChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score       Float          @default(0)
+  totalMarks  Float          @default(0)
+  accuracy    Float          @default(0)
+  timeTaken   Int            @default(0) // seconds
+  completedAt DateTime       @default(now())
+
+  @@unique([challengeId, userId])
+  @@index([userId])
+}

@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #14171C;
+  --paper: #F7F6F3;
+  --surface: #FFFFFF;
+  --line: #E4E1D9;
+  --accent: #1E4D3A;
+  --accent-hover: #15382A;
+  --accent-light: #EBF3EE;
+  --signal-correct: #2F7A4D;
+  --signal-wrong: #B4433A;
+  --signal-review: #B8860B;
+}
+
+.dark {
+  --ink: #ECEAE3;
+  --paper: #14171A;
+  --surface: #1B1F1E;
+  --line: #2A2F2C;
+  --accent: #4C9A79;
+  --accent-hover: #5DB58E;
+  --accent-light: #162920;
+  --signal-correct: #3FA066;
+  --signal-wrong: #CE554C;
+  --signal-review: #D49D14;
+}
+
+body {
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  min-height: 100vh;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-serif-display {
+  font-family: 'Newsreader', Georgia, serif;
+}
+
+/* Custom scrollbars for exam palette & review */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink);
+  opacity: 0.3;
+}

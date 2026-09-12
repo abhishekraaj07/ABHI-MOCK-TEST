@@ -1,0 +1,22 @@
+{
+  "name": "ABHI MOCK TEST - Practice. Analyze. Improve.",
+  "short_name": "ABHI MOCK",
+  "description": "High-fidelity mock test engine for Indian competitive examinations including SBI PO, SSC CGL, IBPS, and Banking.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1b2a",
+  "theme_color": "#1b4965",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
