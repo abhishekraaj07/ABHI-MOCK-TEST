@@ -24,14 +24,15 @@ import {
 import defaultConfig from '../../firebase-applet-config.example.json';
 
 // Safely discover local uncommitted config if present, otherwise use example config
-const localConfigs = import.meta.glob('../../firebase-applet-config.json', { eager: true });
+const metaAny = import.meta as any;
+const localConfigs = typeof metaAny?.glob === 'function' ? metaAny.glob('../../firebase-applet-config.json', { eager: true }) : {};
 const localConfig = (localConfigs['../../firebase-applet-config.json'] as any)?.default || {};
 
 const firebaseConfig = {
   ...defaultConfig,
   ...localConfig,
   apiKey:
-    import.meta.env.VITE_FIREBASE_API_KEY ||
+    metaAny?.env?.VITE_FIREBASE_API_KEY ||
     localConfig.apiKey ||
     defaultConfig.apiKey ||
     'development-placeholder-key',
