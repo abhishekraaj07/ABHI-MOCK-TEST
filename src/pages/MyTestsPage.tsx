@@ -34,10 +34,51 @@ export const MyTestsPage: React.FC = () => {
           credentials: 'include',
         });
 
+        let attemptList: AttemptHistoryItem[] = [];
         if (res.ok) {
-          const json = await res.json();
-          setAttempts(json.attempts || []);
+          try {
+            const json = await res.json();
+            attemptList = json.attempts || [];
+          } catch {}
         }
+
+        // Merge local test history
+        try {
+          const localHistory = JSON.parse(localStorage.getItem('abhi_test_history') || '[]');
+          if (Array.isArray(localHistory) && localHistory.length > 0) {
+            const convertedLocal: AttemptHistoryItem[] = localHistory.map((h: any) => ({
+              id: h.id,
+              testId: h.testId,
+              testTitle: h.testTitle,
+              examName: h.examName,
+              subjectName: h.subjectName || 'Full Syllabus',
+              testType: h.testType || 'Full Length',
+              duration: h.duration || h.durationMinutes || 60,
+              totalMarks: h.totalMarks || 100,
+              questionCount: h.questionCount || 20,
+              status: (h.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'COMPLETED') as 'IN_PROGRESS' | 'COMPLETED',
+              startedAt: h.startedAt || new Date().toISOString(),
+              submittedAt: h.submittedAt || null,
+              timeTaken: h.timeTaken || 1200,
+              score: h.score || 0,
+              percentage: h.percentage || 0,
+              accuracy: h.accuracy || 0,
+              correctCount: h.correctCount || 0,
+              wrongCount: h.wrongCount || 0,
+              unansweredCount: h.unansweredCount || 0,
+            }));
+            const localIds = new Set(convertedLocal.map((cl) => cl.id));
+            attemptList = [...convertedLocal, ...attemptList.filter((a) => !localIds.has(a.id))];
+          }
+        } catch {}
+
+        if (activeTab === 'Completed') {
+          attemptList = attemptList.filter((a) => a.status === 'COMPLETED');
+        } else if (activeTab === 'In Progress') {
+          attemptList = attemptList.filter((a) => a.status === 'IN_PROGRESS');
+        }
+
+        setAttempts(attemptList);
       } catch (e) {
         console.error('Failed to load attempts:', e);
       } finally {

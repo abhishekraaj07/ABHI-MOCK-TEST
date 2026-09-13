@@ -106,6 +106,10 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
     }
 
     // 5. /api/attempts
+    if (pathname === '/api/attempts' && method === 'GET') {
+      const storedHistory = JSON.parse(localStorage.getItem('abhi_test_history') || '[]');
+      return jsonResponse({ attempts: storedHistory });
+    }
     if (pathname.match(/^\/api\/attempts\/[^/]+\/answer$/) && method === 'POST') {
       const attemptId = pathname.split('/')[3];
       const res = saveFallbackAttemptAnswer(
@@ -165,6 +169,41 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
     }
 
     // 8. /api/analytics
+    if (pathname === '/api/analytics/wrong-questions') {
+      const storedWrongs = JSON.parse(localStorage.getItem('abhi_wrong_questions') || '[]');
+      if (storedWrongs.length > 0) {
+        return jsonResponse({ wrongQuestions: storedWrongs });
+      }
+      const defaultWrongs = FALLBACK_QUESTIONS.slice(0, 6).map((q: any, idx: number) => {
+        const correctOpt = q.options?.find((o: any) => o.isCorrect) || q.options?.[0];
+        const wrongOpt = q.options?.find((o: any) => !o.isCorrect) || q.options?.[1] || correctOpt;
+        return {
+          questionId: q.id,
+          questionText: q.questionText,
+          difficulty: q.difficulty || 'Moderate',
+          marks: q.marks || 1,
+          negativeMarks: q.negativeMarks || 0.25,
+          explanation: q.explanation || 'Detailed concept revision required.',
+          shortcut: q.shortcut || null,
+          subjectName: q.subject?.name || 'General',
+          topicName: q.topic?.name || 'High Yield Topics',
+          examName: 'SBI PO / SSC CGL',
+          correctOptionKey: correctOpt?.optionKey || 'A',
+          correctOptionText: correctOpt?.optionText || '',
+          lastChosenOption: wrongOpt?.optionKey || 'B',
+          missCount: (idx % 3) + 1,
+          lastAttemptDate: new Date(Date.now() - ((idx + 1) * 86400000)).toISOString(),
+          lastTestTitle: 'All-India Prelims Live Mock',
+          options: (q.options || []).map((o: any) => ({
+            optionKey: o.optionKey,
+            optionText: o.optionText,
+            isCorrect: Boolean(o.isCorrect),
+          })),
+        };
+      });
+      return jsonResponse({ wrongQuestions: defaultWrongs });
+    }
+
     if (pathname.startsWith('/api/analytics')) {
       return jsonResponse({
         overview: {
@@ -187,22 +226,103 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
       const stored = JSON.parse(localStorage.getItem('abhi_bookmarks') || '[]');
       if (method === 'POST') {
         const questionId = bodyData.questionId;
-        if (questionId && !stored.includes(questionId)) {
-          stored.push(questionId);
+        const exists = stored.some((b: any) => (b.questionId || b.id) === questionId);
+        if (questionId && !exists) {
+          const q = FALLBACK_QUESTIONS.find((item) => item.id === questionId);
+          const correctOpt = q?.options?.find((o: any) => o.isCorrect) || q?.options?.[0];
+          const newBookmark = {
+            id: `bm_${questionId}`,
+            questionId,
+            questionText: q?.questionText || 'Revision Question',
+            subjectName: q?.subject?.name || 'General',
+            topicName: q?.topic?.name || 'General',
+            examName: 'SBI PO / SSC CGL',
+            difficulty: q?.difficulty || 'Moderate',
+            explanation: q?.explanation || 'Bookmark recorded.',
+            correctOptionKey: correctOpt?.optionKey || 'A',
+            correctOptionText: correctOpt?.optionText || '',
+            createdAt: new Date().toISOString(),
+            options: q?.options || [],
+          };
+          stored.unshift(newBookmark);
           localStorage.setItem('abhi_bookmarks', JSON.stringify(stored));
         }
-        return jsonResponse({ success: true, bookmarks: stored });
+        return jsonResponse({ success: true, bookmarked: true, bookmarks: stored });
       }
       return jsonResponse({ bookmarks: stored });
+    }
+    if (pathname.startsWith('/api/bookmarks/') && method === 'DELETE') {
+      const id = pathname.replace('/api/bookmarks/', '');
+      const stored = JSON.parse(localStorage.getItem('abhi_bookmarks') || '[]');
+      const filtered = stored.filter((b: any) => b.id !== id && b.questionId !== id);
+      localStorage.setItem('abhi_bookmarks', JSON.stringify(filtered));
+      return jsonResponse({ success: true, id, removed: true });
     }
 
     // 10. /api/dashboard
     if (pathname === '/api/dashboard') {
+      const history = JSON.parse(localStorage.getItem('abhi_test_history') || '[]');
+      const testsAttempted = history.length;
+      const totalScore = history.reduce((acc: number, h: any) => acc + (h.score || 0), 0);
+      const totalAcc = history.reduce((acc: number, h: any) => acc + (h.accuracy || 0), 0);
+      const avgScore = testsAttempted > 0 ? parseFloat((totalScore / testsAttempted).toFixed(1)) : 78.5;
+      const avgAccuracy = testsAttempted > 0 ? parseFloat((totalAcc / testsAttempted).toFixed(1)) : 84.5;
+      const bestScore = testsAttempted > 0 ? Math.max(...history.map((h: any) => h.score || 0)) : 88.0;
+
       return jsonResponse({
-        stats: FALLBACK_STATS,
-        recentAttempts: [],
-        dailyChallenge: getFallbackDailyChallenge(),
-        recommendedTests: FALLBACK_TESTS.slice(0, 4),
+        summary: {
+          testsAttempted: Math.max(1, testsAttempted),
+          avgScore,
+          bestScore,
+          avgAccuracy,
+          streak: 1,
+        },
+        trendData: history.length > 0
+          ? history.slice(0, 10).reverse().map((h: any, idx: number) => ({
+              index: idx + 1,
+              date: h.submittedAt ? new Date(h.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : `T${idx + 1}`,
+              title: h.testTitle,
+              score: h.score,
+              accuracy: h.accuracy,
+              percentage: h.percentage,
+            }))
+          : [
+              { index: 1, date: 'Prev', title: 'Diagnostic Drill', score: 72, accuracy: 80, percentage: 72 },
+              { index: 2, date: 'Recent', title: 'Speed Test', score: 78.5, accuracy: 84.5, percentage: 78.5 },
+            ],
+        weakSubjects: [
+          { subject: 'Quantitative Aptitude', accuracy: 56.4, totalQuestions: 25 },
+          { subject: 'Reasoning Ability', accuracy: 62.0, totalQuestions: 30 },
+        ],
+        recommendations: [
+          {
+            title: 'Focus Drill: Quantitative Aptitude',
+            reason: 'Your accuracy is currently 56.4% across 25 attempted questions.',
+            action: 'Practice Topics',
+            link: '/practice',
+          },
+          {
+            title: 'Attempt Full-Length Mock Test',
+            reason: 'Consistent timed pacing improves retention and sectional cutoffs.',
+            action: 'Browse Mock Tests',
+            link: '/mock-tests',
+          },
+        ],
+        recentTests: history.length > 0 ? history.slice(0, 5) : [
+          {
+            attemptId: 'att_de94ec9c-7468-42bd-8206-20edf41c9295_recent',
+            testId: 'de94ec9c-7468-42bd-8206-20edf41c9295',
+            title: 'SBI PO Prelims Full Mock 1',
+            examName: 'SBI PO',
+            score: 78.5,
+            totalMarks: 100,
+            percentage: 78.5,
+            accuracy: 84.5,
+            status: 'COMPLETED',
+            submittedAt: new Date().toISOString(),
+          },
+        ],
+        activeAttempt: null,
       });
     }
 
@@ -211,7 +331,31 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
       return jsonResponse({ success: true, message: 'Report submitted successfully.' });
     }
 
-    // 12. /api/auth/guest-session & /api/auth/me
+    // 12. /api/gemini/personas & /api/gemini/chat
+    if (pathname === '/api/gemini/personas') {
+      return jsonResponse({
+        personas: [
+          { id: 'exam-mentor', name: 'Exam Mentor', description: 'Holistic strategy, timetables & section management' },
+          { id: 'quant-reasoning', name: 'Quant & Reasoning Master', description: 'Step-by-step proofs + 20-second shortcut tricks' },
+          { id: 'quick-doubts', name: 'Lightning Doubts', description: 'Rapid formula verification & quick answers' },
+          { id: 'question-explainer', name: 'Question Dissector', description: 'Option trap analysis & deep-dive solutions' },
+        ],
+        models: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'],
+      });
+    }
+
+    if (pathname === '/api/gemini/chat' && method === 'POST') {
+      const messages = bodyData.messages || [];
+      const model = bodyData.model || 'gemini-2.5-flash';
+      const lastUserMsg = messages[messages.length - 1]?.content || 'Exam preparation strategy';
+      return jsonResponse({
+        success: true,
+        reply: `### AI Exam Mentor Strategy\n\n- **Question Focus:** Consistent accuracy is paramount under negative marking (-0.25).\n- **Topic Recommendation:** Review your Mistake Notebook before starting full mocks.\n- **Speed Drill:** Practice daily with the 5-question sprint challenge.`,
+        modelUsed: `${model}-client-engine`,
+      });
+    }
+
+    // 13. /api/auth/guest-session & /api/auth/me
     if (pathname === '/api/auth/guest-session' && method === 'POST') {
       const guestUser = {
         id: `guest_${Date.now()}`,

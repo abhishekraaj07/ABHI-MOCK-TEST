@@ -52,8 +52,75 @@ export const DashboardPage: React.FC = () => {
           credentials: 'include',
         });
 
+        let json: any = null;
         if (res.ok) {
-          const json = await res.json();
+          try {
+            json = await res.json();
+          } catch {}
+        }
+
+        // Merge locally completed attempts if available
+        try {
+          const localHistory = JSON.parse(localStorage.getItem('abhi_test_history') || '[]');
+          if (Array.isArray(localHistory) && localHistory.length > 0) {
+            if (!json) {
+              json = {
+                summary: { testsAttempted: 0, avgScore: 0, bestScore: 0, avgAccuracy: 0, streak: 1 },
+                trendData: [],
+                weakSubjects: [],
+                recommendations: [],
+                recentTests: [],
+                activeAttempt: null,
+              };
+            }
+
+            const existingIds = new Set(localHistory.map((h: any) => h.id));
+            const formattedLocal = localHistory.map((h: any) => ({
+              attemptId: h.id,
+              testId: h.testId,
+              title: h.testTitle || 'Mock Examination',
+              examName: h.examName || 'Competitive Exam',
+              score: h.score,
+              totalMarks: h.totalMarks || 100,
+              percentage: h.percentage,
+              accuracy: h.accuracy,
+              status: h.status || 'COMPLETED',
+              submittedAt: h.submittedAt || new Date().toISOString(),
+            }));
+
+            const combinedRecent = [
+              ...formattedLocal,
+              ...(json.recentTests || []).filter((t: any) => !existingIds.has(t.attemptId)),
+            ];
+
+            const testsAttempted = combinedRecent.length;
+            const totalScore = combinedRecent.reduce((acc: number, t: any) => acc + (t.score || 0), 0);
+            const totalAcc = combinedRecent.reduce((acc: number, t: any) => acc + (t.accuracy || 0), 0);
+            const avgScore = testsAttempted > 0 ? parseFloat((totalScore / testsAttempted).toFixed(1)) : 78.5;
+            const avgAccuracy = testsAttempted > 0 ? parseFloat((totalAcc / testsAttempted).toFixed(1)) : 84.5;
+            const bestScore = Math.max(...combinedRecent.map((t: any) => t.score || 0));
+
+            json.summary = {
+              testsAttempted,
+              avgScore,
+              bestScore,
+              avgAccuracy,
+              streak: Math.max(1, json.summary?.streak || 1),
+            };
+
+            json.recentTests = combinedRecent;
+            json.trendData = combinedRecent.slice(0, 10).reverse().map((t: any, idx: number) => ({
+              index: idx + 1,
+              date: t.submittedAt ? new Date(t.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : `T${idx + 1}`,
+              title: t.title,
+              score: t.score,
+              accuracy: t.accuracy,
+              percentage: t.percentage,
+            }));
+          }
+        } catch {}
+
+        if (json) {
           setData(json);
         }
       } catch (err) {

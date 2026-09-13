@@ -357,12 +357,11 @@ export function submitFallbackDailyChallenge(payload: {
 
 // ==========================================
 // TEST ENGINE ATTEMPTS & RESPONSES
-// ==========================================
 export function startFallbackTestAttempt(testId: string): any {
   const testFull = FALLBACK_TESTS_WITH_QUESTIONS.find((t) => t.id === testId) ||
     FALLBACK_TESTS_WITH_QUESTIONS[0];
 
-  const attemptId = `att_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const attemptId = `att_${testFull.id}_${Date.now()}`;
 
   const activeQuestions = (testFull.questions || []).map((q: any, idx: number) => ({
     questionId: q.id || q.questionId || `q-${idx + 1}`,
@@ -599,6 +598,55 @@ export function submitFallbackTestAttempt(attemptId: string, _timeSpent = 0): an
     const results = JSON.parse(localStorage.getItem('abhi_local_results') || '{}');
     results[attemptId] = fullResult;
     localStorage.setItem('abhi_local_results', JSON.stringify(results));
+
+    // Save to test history
+    const existingHistory = JSON.parse(localStorage.getItem('abhi_test_history') || '[]');
+    const historyItem = {
+      id: attemptId,
+      testId: testFull.id,
+      testTitle: testFull.title,
+      examName: testFull.examName || 'Competitive Exam',
+      subjectName: testFull.subjectName || 'Full Syllabus',
+      status: 'COMPLETED',
+      score: finalScore,
+      totalMarks,
+      percentage,
+      accuracy,
+      startedAt: attempt?.startedAt || new Date(Date.now() - 3600000).toISOString(),
+      submittedAt: new Date().toISOString(),
+      durationMinutes: testFull.duration || 60,
+      timeTaken: Math.min(testFull.duration * 60, 1800),
+    };
+    const updatedHistory = [historyItem, ...existingHistory.filter((h: any) => h.id !== attemptId)];
+    localStorage.setItem('abhi_test_history', JSON.stringify(updatedHistory));
+
+    // Save wrong questions to mistake notebook
+    const wrongQuestions = reviewQuestions
+      .filter((q: any) => q.status === 'WRONG')
+      .map((q: any) => ({
+        questionId: q.questionId,
+        questionText: q.questionText,
+        difficulty: q.difficulty || 'Moderate',
+        marks: q.marks || 1,
+        negativeMarks: q.negativeMarks || 0.25,
+        explanation: q.explanation || 'Detailed solution will appear after test completion.',
+        shortcut: null,
+        subjectName: q.subjectName,
+        topicName: q.topicName,
+        examName: testFull.examName || 'Competitive Exam',
+        correctOptionKey: q.correctOptionKey,
+        correctOptionText: q.correctOptionText,
+        lastChosenOption: q.selectedOption,
+        missCount: 1,
+        lastAttemptDate: new Date().toISOString(),
+        lastTestTitle: testFull.title,
+        options: q.options || [],
+      }));
+    if (wrongQuestions.length > 0) {
+      const existingWrongs = JSON.parse(localStorage.getItem('abhi_wrong_questions') || '[]');
+      const newWrongs = [...wrongQuestions, ...existingWrongs.filter((w: any) => !wrongQuestions.some((nw: any) => nw.questionId === w.questionId))];
+      localStorage.setItem('abhi_wrong_questions', JSON.stringify(newWrongs));
+    }
   } catch {}
 
   return fullResult;

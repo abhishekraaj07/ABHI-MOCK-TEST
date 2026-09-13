@@ -87,14 +87,35 @@ export const WrongQuestionsPage: React.FC = () => {
           credentials: 'include',
         });
 
-        if (!res.ok) {
-          throw new Error('Failed to load mistake notebook.');
+        let wrongList: WrongQuestion[] = [];
+        if (res.ok) {
+          try {
+            const data = await res.json();
+            wrongList = data.wrongQuestions || [];
+          } catch {}
         }
 
-        const data = await res.json();
-        setQuestions(data.wrongQuestions || []);
+        // Merge locally captured wrong questions from test engine
+        try {
+          const localWrongs = JSON.parse(localStorage.getItem('abhi_wrong_questions') || '[]');
+          if (Array.isArray(localWrongs) && localWrongs.length > 0) {
+            const localIds = new Set(localWrongs.map((w: any) => w.questionId));
+            wrongList = [...localWrongs, ...wrongList.filter((q) => !localIds.has(q.questionId))];
+          }
+        } catch {}
+
+        setQuestions(wrongList);
       } catch (err: any) {
         console.error('Error fetching mistake questions:', err);
+        // Fallback to local wrongs if network fails
+        try {
+          const localWrongs = JSON.parse(localStorage.getItem('abhi_wrong_questions') || '[]');
+          if (Array.isArray(localWrongs) && localWrongs.length > 0) {
+            setQuestions(localWrongs);
+            setError(null);
+            return;
+          }
+        } catch {}
         setError(err.message || 'Failed to load mistake notebook.');
       } finally {
         setLoading(false);

@@ -46,12 +46,32 @@ export const BookmarksPage: React.FC = () => {
           credentials: 'include',
         });
 
+        let bookmarkList = [];
         if (res.ok) {
-          const json = await res.json();
-          setBookmarks(json.bookmarks || []);
+          try {
+            const json = await res.json();
+            bookmarkList = json.bookmarks || [];
+          } catch {}
         }
+
+        // Merge locally flagged bookmarks
+        try {
+          const localBms = JSON.parse(localStorage.getItem('abhi_bookmarks') || '[]');
+          if (Array.isArray(localBms) && localBms.length > 0) {
+            const localIds = new Set(localBms.map((b: any) => b.questionId || b.id));
+            bookmarkList = [...localBms, ...bookmarkList.filter((b: any) => !localIds.has(b.questionId || b.id))];
+          }
+        } catch {}
+
+        setBookmarks(bookmarkList);
       } catch (e) {
         console.error(e);
+        try {
+          const localBms = JSON.parse(localStorage.getItem('abhi_bookmarks') || '[]');
+          if (Array.isArray(localBms) && localBms.length > 0) {
+            setBookmarks(localBms);
+          }
+        } catch {}
       } finally {
         setLoading(false);
       }
@@ -65,14 +85,18 @@ export const BookmarksPage: React.FC = () => {
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await apiFetch(`/api/bookmarks/${id}`, {
+      await apiFetch(`/api/bookmarks/${id}`, {
         method: 'DELETE',
         headers,
         credentials: 'include',
       });
-      if (res.ok) {
-        setBookmarks((prev) => prev.filter((b) => b.id !== id && b.questionId !== id));
-      }
+      setBookmarks((prev) => prev.filter((b) => b.id !== id && b.questionId !== id));
+
+      try {
+        const stored = JSON.parse(localStorage.getItem('abhi_bookmarks') || '[]');
+        const updated = stored.filter((b: any) => b.id !== id && b.questionId !== id);
+        localStorage.setItem('abhi_bookmarks', JSON.stringify(updated));
+      } catch {}
     } catch (e) {
       console.error(e);
     }

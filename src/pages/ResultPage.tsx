@@ -56,20 +56,31 @@ export const ResultPage: React.FC<{ attemptId: string }> = ({ attemptId }) => {
 
     async function loadResult() {
       try {
-        const token = localStorage.getItem('abhi_token');
-        const headers: Record<string, string> = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-
-        const res = await fetch(`/api/results/${attemptId}`, {
-          headers,
-          credentials: 'include',
-        });
-
         let json: ResultData | null = null;
-        if (res.ok) {
-          try {
-            json = await res.json();
-          } catch {}
+
+        // 1. Check local saved results first (has candidate's actual responses)
+        try {
+          const localResults = JSON.parse(localStorage.getItem('abhi_local_results') || '{}');
+          if (localResults[attemptId] && localResults[attemptId].result) {
+            json = localResults[attemptId];
+          }
+        } catch {}
+
+        if (!json) {
+          const token = localStorage.getItem('abhi_token');
+          const headers: Record<string, string> = {};
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+
+          const res = await fetch(`/api/results/${attemptId}`, {
+            headers,
+            credentials: 'include',
+          });
+
+          if (res.ok) {
+            try {
+              json = await res.json();
+            } catch {}
+          }
         }
 
         if (!json || !json.result) {

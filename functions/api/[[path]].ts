@@ -88,6 +88,112 @@ function json(data: any, status = 200) {
   });
 }
 
+function findTest(testIdOrSlug: string) {
+  return (
+    dbData.testsWithQuestions?.find((t: any) => t.id === testIdOrSlug || t.slug === testIdOrSlug) ||
+    dbData.tests?.find((t: any) => t.id === testIdOrSlug || t.slug === testIdOrSlug) ||
+    dbData.testsWithQuestions?.[0] ||
+    dbData.tests?.[0]
+  );
+}
+
+function getQuestionsForTest(testIdOrSlug: string) {
+  const testWithQ = dbData.testsWithQuestions?.find(
+    (t: any) => t.id === testIdOrSlug || t.slug === testIdOrSlug
+  );
+  if (testWithQ && Array.isArray(testWithQ.questions) && testWithQ.questions.length > 0) {
+    return testWithQ.questions;
+  }
+  const test = dbData.tests?.find((t: any) => t.id === testIdOrSlug || t.slug === testIdOrSlug);
+  if (test) {
+    const matching = (dbData.questions || []).filter(
+      (q: any) => q.subjectId === test.subjectId || q.testId === test.id
+    );
+    if (matching.length > 0) return matching.slice(0, test.questionCount || 20);
+  }
+  return dbData.testsWithQuestions?.[0]?.questions || (dbData.questions || []).slice(0, 20);
+}
+
+function parseTestIdFromAttempt(attemptId: string): string {
+  if (attemptId.startsWith('att_')) {
+    const parts = attemptId.split('_');
+    if (parts.length >= 3 && parts[1] !== 'edge') {
+      return parts.slice(1, parts.length - 1).join('_');
+    }
+  }
+  const directMatch = dbData.testsWithQuestions?.find((t: any) => t.id === attemptId);
+  if (directMatch) return directMatch.id;
+  return dbData.testsWithQuestions?.[0]?.id || 'de94ec9c-7468-42bd-8206-20edf41c9295';
+}
+
+function generatePedagogicalFallback(prompt: string, _persona: string = 'exam-mentor'): string {
+  const p = (prompt || '').toLowerCase();
+
+  if (p.includes('syllogism') || p.includes('statement') || p.includes('conclusion')) {
+    return `### Syllogism Diagnostic & Venn Method
+
+**Standard Rules:**
+1. **"All A are B" + "All B are C"** ⇒ "All A are C" is definitely true.
+2. **"Some A are B"** ⇒ Reversible: "Some B are A".
+3. **"No A is B"** ⇒ Fully disjoint sets. No intersection allowed.
+4. **"Only a few A are B"** ⇒ "Some A are B" AND "Some A are NOT B" (both are simultaneously true).
+
+**Exam Shortcut:**
+- Draw minimum overlapping diagrams for definite conclusions.
+- For "possibility" questions ("can be / is a possibility"), check if any non-contradictory diagram exists. If yes, the possibility is VALID.`;
+  }
+
+  if (p.includes('percentage') || p.includes('profit') || p.includes('loss') || p.includes('discount')) {
+    return `### Quant High-Yield Shortcuts: Percentage & Profit-Loss
+
+**1. Price-Consumption Invariance:**
+- If price increases by $r\\%$, consumption must decrease by:
+  $$\\Delta C = \\left(\\frac{r}{100 + r}\\right) \\times 100\\%$$
+- Example: 25% price increase $\\implies \\frac{25}{125} \\times 100\\% = 20\\%$ reduction.
+
+**2. Successive Changes:**
+- Effective change $= a + b + \\frac{a \\times b}{100}\\%$
+- For discount $d_1$ and $d_2$: Effective Discount $= d_1 + d_2 - \\frac{d_1 \\times d_2}{100}\\%$.
+
+**3. Margin Trap:**
+- Profit on Cost Price $\\neq$ Profit on Selling Price. Always base your ratio on $CP = 100$ unless explicitly asked for SP.`;
+  }
+
+  if (p.includes('cutoff') || p.includes('strategy') || p.includes('score') || p.includes('timetable') || p.includes('tips')) {
+    return `### Exam Strategy & Sectional Cutoff Optimization
+
+**1. Time Allocation Blueprint (60-minute Prelims):**
+- **Reasoning Ability (20 mins):** Attempt standalone questions first (Inequalities, Syllogisms, Direction, Coding-Decoding) in 6-7 mins. Dedicate remaining 13 mins to 2-3 standard puzzles. Target: 28-32 marks.
+- **Quantitative Aptitude (20 mins):** Simplification/Approximation (5 Qs in 2.5 mins), Quadratic Equations (5 Qs in 2.5 mins), Number Series (5 Qs in 3 mins), DI (5 Qs in 6 mins). Arithmetic last. Target: 24-28 marks.
+- **English Language (20 mins):** Error spotting, Cloze test, Fillers (10 mins). RC passage (10 mins). Target: 22-26 marks.
+
+**2. The 30-Second Skip Rule:**
+- Never spend more than 45 seconds on any single question without an active pathway to the solution. Mark for review and move on immediately.`;
+  }
+
+  if (p.includes('puzzle') || p.includes('seating') || p.includes('arrangement')) {
+    return `### Seating Arrangement & Floor Puzzle Strategy
+
+**1. Parallel Case Elimination Method:**
+- Never solve a puzzle with a single diagram. Always draw **2 parallel cases** from clue #1.
+- Eliminate case 2 as soon as a condition fails (usually around clue 4 or 5).
+
+**2. Definitive Anchor Clues First:**
+- Identify fixed positions (e.g. "A sits at an extreme end", "B lives on an even-numbered floor below floor 4").
+- Chain relative clues to the established anchor to prevent redundant branches.`;
+  }
+
+  return `### ABHI AI Exam Mentor Guidance
+
+**Core Diagnostic Principles:**
+1. **Accuracy > Attempts:** Negative marking (-0.25) penalizes blind guessing. Every wrong answer robs you of 1.25 marks compared to a correct answer.
+2. **Review Mistake Notebook Daily:** Revisit previously missed questions in your **Mistake Notebook** before starting any new full-length mock.
+3. **Speed Drill Consistency:** Attempt the 5-question **Daily Sprint Challenge** every morning to maintain cognitive agility across mixed reasoning and math topics.
+
+Feel free to paste any specific question or formula, and I will dissect the options, traps, and fastest shortcut!`;
+}
+
+
 export async function onRequest(context: any): Promise<Response> {
   const { request } = context;
   const url = new URL(request.url);
@@ -259,14 +365,28 @@ export async function onRequest(context: any): Promise<Response> {
   // 2b. /api/tests/:id/start
   if (pathname.match(/^\/api\/tests\/[^/]+\/start$/) && method === 'POST') {
     const testId = pathname.split('/')[3];
-    const attemptId = `att_edge_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-    return json({ success: true, attemptId, message: 'Official attempt session initialized.' });
+    const test = findTest(testId);
+    const attemptId = `att_${test.id}_${Date.now()}`;
+    return json({
+      success: true,
+      attemptId,
+      test: {
+        id: test.id,
+        title: test.title,
+        duration: test.duration || 60,
+        totalMarks: test.totalMarks || 100,
+        negativeMarks: test.negativeMarks ?? 0.25,
+        difficulty: test.difficulty || 'Moderate',
+        questionCount: test.questionCount || 20,
+      },
+      message: 'Official attempt session initialized.'
+    });
   }
 
   // 2c. /api/tests/:id
   if (pathname.startsWith('/api/tests/')) {
     const testId = pathname.replace('/api/tests/', '');
-    const found = (dbData.tests || []).find((t: any) => t.id === testId) || (dbData.tests || [])[0];
+    const found = findTest(testId);
     const qCount = found?.questionCount || 20;
     const dur = found?.duration || 60;
     const tMarks = found?.totalMarks || 100;
@@ -437,18 +557,33 @@ export async function onRequest(context: any): Promise<Response> {
 
   // 6. /api/analytics
   if (pathname === '/api/analytics/wrong-questions') {
-    const wrongQs = (dbData.questions || []).slice(0, 6).map((q: any) => ({
-      id: q.id,
-      questionText: q.questionText,
-      subjectName: q.subject?.name || 'General',
-      topicName: q.topic?.name || 'Topic Drill',
-      difficulty: q.difficulty || 'Moderate',
-      options: q.options || [],
-      correctOption: q.options?.find((o: any) => o.isCorrect)?.optionKey || 'A',
-      selectedOption: 'B',
-      explanation: q.explanation || 'Review concepts thoroughly.',
-      testTitle: 'SBI PO Full Mock 1',
-    }));
+    const wrongQs = (dbData.questions || []).slice(0, 8).map((q: any, idx: number) => {
+      const correctOpt = q.options?.find((o: any) => o.isCorrect) || q.options?.[0];
+      const wrongOpt = q.options?.find((o: any) => !o.isCorrect) || q.options?.[1] || correctOpt;
+      return {
+        questionId: q.id,
+        questionText: q.questionText,
+        difficulty: q.difficulty || 'Moderate',
+        marks: q.marks || 1,
+        negativeMarks: q.negativeMarks || 0.25,
+        explanation: q.explanation || 'Detailed concept revision required.',
+        shortcut: q.shortcut || null,
+        subjectName: q.subject?.name || 'General',
+        topicName: q.topic?.name || 'High Yield Topics',
+        examName: 'SBI PO / SSC CGL',
+        correctOptionKey: correctOpt?.optionKey || 'A',
+        correctOptionText: correctOpt?.optionText || '',
+        lastChosenOption: wrongOpt?.optionKey || 'B',
+        missCount: (idx % 3) + 1,
+        lastAttemptDate: new Date(Date.now() - ((idx + 1) * 86400000)).toISOString(),
+        lastTestTitle: 'All-India Prelims Live Mock',
+        options: (q.options || []).map((o: any) => ({
+          optionKey: o.optionKey,
+          optionText: o.optionText,
+          isCorrect: Boolean(o.isCorrect),
+        })),
+      };
+    });
     return json({ wrongQuestions: wrongQs });
   }
 
@@ -472,20 +607,94 @@ export async function onRequest(context: any): Promise<Response> {
   // 7. /api/dashboard
   if (pathname === '/api/dashboard') {
     return json({
-      stats: {
-        totalExams: EXAMS.length,
-        totalTests: (dbData.tests || []).length,
-        totalQuestions: (dbData.questions || []).length,
-        availabilityRate: '99.9%',
+      summary: {
+        testsAttempted: 1,
+        avgScore: 78.5,
+        bestScore: 88.0,
+        avgAccuracy: 84.5,
+        streak: 1,
       },
-      recentAttempts: [],
-      recommendedTests: (dbData.tests || []).slice(0, 4),
+      trendData: [
+        { index: 1, date: 'Prev', title: 'Diagnostic Drill', score: 72, accuracy: 80, percentage: 72 },
+        { index: 2, date: 'Recent', title: 'Speed Test', score: 78.5, accuracy: 84.5, percentage: 78.5 },
+      ],
+      weakSubjects: [
+        { subject: 'Quantitative Aptitude', accuracy: 56.4, totalQuestions: 25 },
+        { subject: 'Reasoning Ability', accuracy: 62.0, totalQuestions: 30 },
+      ],
+      recommendations: [
+        {
+          title: 'Focus Drill: Quantitative Aptitude',
+          reason: 'Your accuracy is currently 56.4% across 25 attempted questions.',
+          action: 'Practice Topics',
+          link: '/practice',
+        },
+        {
+          title: 'Attempt Full-Length Mock Test',
+          reason: 'Consistent timed pacing improves retention and sectional cutoffs.',
+          action: 'Browse Mock Tests',
+          link: '/mock-tests',
+        },
+        {
+          title: 'Speed Drill: Reasoning Ability',
+          reason: 'Puzzles and syllogisms benefit from 20-minute timed sectional drills.',
+          action: 'Sectional Tests',
+          link: '/mock-tests?tab=Sectional',
+        },
+      ],
+      recentTests: [
+        {
+          attemptId: 'att_de94ec9c-7468-42bd-8206-20edf41c9295_recent',
+          testId: 'de94ec9c-7468-42bd-8206-20edf41c9295',
+          title: 'SBI PO Prelims Full Mock 1',
+          examName: 'SBI PO',
+          score: 78.5,
+          totalMarks: 100,
+          percentage: 78.5,
+          accuracy: 84.5,
+          status: 'COMPLETED',
+          submittedAt: new Date().toISOString(),
+        },
+      ],
+      activeAttempt: null,
     });
   }
 
   // 8. /api/bookmarks
-  if (pathname === '/api/bookmarks') {
-    return json({ bookmarks: [] });
+  if (pathname === '/api/bookmarks' && method === 'GET') {
+    const sampleBookmarks = (dbData.questions || []).slice(0, 6).map((q: any, idx: number) => {
+      const correctOpt = q.options?.find((o: any) => o.isCorrect) || q.options?.[0];
+      return {
+        id: `bm-${idx + 1}`,
+        questionId: q.id,
+        questionText: q.questionText,
+        subjectName: q.subject?.name || 'General',
+        topicName: q.topic?.name || 'High-Yield Formulae',
+        examName: 'SBI PO / SSC CGL',
+        difficulty: q.difficulty || 'Moderate',
+        explanation: q.explanation || 'Key conceptual checkpoint for speed and accuracy.',
+        correctOptionKey: correctOpt?.optionKey || 'A',
+        correctOptionText: correctOpt?.optionText || '',
+        createdAt: new Date(Date.now() - (idx * 3600000)).toISOString(),
+        options: (q.options || []).map((o: any) => ({
+          optionKey: o.optionKey,
+          optionText: o.optionText,
+          isCorrect: Boolean(o.isCorrect),
+        })),
+      };
+    });
+    return json({ bookmarks: sampleBookmarks });
+  }
+
+  if (pathname === '/api/bookmarks' && method === 'POST') {
+    let body: any = {};
+    try { body = await request.json(); } catch {}
+    return json({ success: true, bookmarked: true, questionId: body.questionId });
+  }
+
+  if (pathname.startsWith('/api/bookmarks/') && method === 'DELETE') {
+    const id = pathname.replace('/api/bookmarks/', '');
+    return json({ success: true, id, removed: true });
   }
 
   // 9. /api/reports
@@ -493,28 +702,210 @@ export async function onRequest(context: any): Promise<Response> {
     return json({ success: true, message: 'Report submitted successfully.' });
   }
 
-  // 10. /api/attempts/:id
+  // 10. /api/attempts archive
+  if (pathname === '/api/attempts' && method === 'GET') {
+    return json({
+      attempts: [
+        {
+          id: 'att_de94ec9c-7468-42bd-8206-20edf41c9295_sample',
+          testId: 'de94ec9c-7468-42bd-8206-20edf41c9295',
+          testTitle: 'SBI PO Prelims Full Mock 1',
+          examName: 'SBI PO',
+          subjectName: 'Full Syllabus',
+          status: 'COMPLETED',
+          score: 78.5,
+          totalMarks: 100,
+          percentage: 78.5,
+          accuracy: 84.5,
+          startedAt: new Date(Date.now() - 3600000).toISOString(),
+          submittedAt: new Date().toISOString(),
+          durationMinutes: 60,
+          timeTaken: 1845,
+        },
+      ],
+    });
+  }
+
+  // 10b. /api/attempts/:id/answer
   if (pathname.match(/^\/api\/attempts\/[^/]+\/answer$/) && method === 'POST') {
     return json({ success: true, message: 'Response recorded' });
   }
 
+  // 10c. /api/attempts/:id/submit
   if (pathname.match(/^\/api\/attempts\/[^/]+\/submit$/) && method === 'POST') {
     const attemptId = pathname.split('/')[3];
-    return json({ success: true, attemptId, status: 'COMPLETED' });
+    const testId = parseTestIdFromAttempt(attemptId);
+    const test = findTest(testId);
+    const rawQuestions = getQuestionsForTest(testId);
+
+    let body: any = {};
+    try {
+      body = await request.json();
+    } catch {}
+
+    const submittedAnswers: Array<{ questionId: string; selectedOption: string | null; timeSpent?: number; isMarked?: boolean }> =
+      body.answers || [];
+    const timeTaken = body.timeTaken || 1200;
+
+    const answerMap = new Map<string, { selectedOption: string | null; timeSpent: number; isMarked: boolean }>();
+    submittedAnswers.forEach((ans) => {
+      answerMap.set(ans.questionId, {
+        selectedOption: ans.selectedOption,
+        timeSpent: ans.timeSpent || 0,
+        isMarked: Boolean(ans.isMarked),
+      });
+    });
+
+    let correctCount = 0;
+    let wrongCount = 0;
+    let unansweredCount = 0;
+    let totalScore = 0;
+
+    const sectionBreakdown: Record<string, any> = {};
+
+    const evaluatedQuestions = rawQuestions.map((q: any, idx: number) => {
+      const qId = q.id || q.questionId || `q-${idx + 1}`;
+      const userAns = answerMap.get(qId);
+      const selectedOpt = userAns?.selectedOption || null;
+
+      const correctOptObj = q.options?.find((o: any) => o.isCorrect) || q.options?.[0];
+      const correctKey = correctOptObj?.optionKey || 'A';
+      const correctText = correctOptObj?.optionText || '';
+
+      const subName = q.subjectName || q.subject?.name || test?.subjectName || 'General';
+      if (!sectionBreakdown[subName]) {
+        sectionBreakdown[subName] = {
+          subjectName: subName,
+          totalQuestions: 0,
+          correct: 0,
+          wrong: 0,
+          unanswered: 0,
+          score: 0,
+          timeSpent: 0,
+          accuracy: 0,
+        };
+      }
+      sectionBreakdown[subName].totalQuestions++;
+
+      const m = q.marks || 1;
+      const nm = q.negativeMarks ?? (test?.negativeMarks ?? 0.25);
+      const qTimeSpent = userAns?.timeSpent || 25;
+      sectionBreakdown[subName].timeSpent += qTimeSpent;
+
+      let status: 'CORRECT' | 'WRONG' | 'UNANSWERED' = 'UNANSWERED';
+      let isCorrect: boolean | null = null;
+
+      if (!selectedOpt) {
+        unansweredCount++;
+        sectionBreakdown[subName].unanswered++;
+      } else if (selectedOpt === correctKey) {
+        correctCount++;
+        status = 'CORRECT';
+        isCorrect = true;
+        totalScore += m;
+        sectionBreakdown[subName].correct++;
+        sectionBreakdown[subName].score += m;
+      } else {
+        wrongCount++;
+        status = 'WRONG';
+        isCorrect = false;
+        totalScore -= nm;
+        sectionBreakdown[subName].wrong++;
+        sectionBreakdown[subName].score -= nm;
+      }
+
+      return {
+        questionId: qId,
+        index: idx + 1,
+        questionText: q.questionText,
+        subjectName: subName,
+        topicName: q.topicName || q.topic?.name || 'General',
+        difficulty: q.difficulty || 'Moderate',
+        marks: m,
+        negativeMarks: nm,
+        selectedOption: selectedOpt,
+        correctOptionKey: correctKey,
+        correctOptionText: correctText,
+        isCorrect,
+        status,
+        explanation: q.explanation || 'Review concepts thoroughly for conceptual clarity.',
+        shortcut: q.shortcut || null,
+        timeSpent: qTimeSpent,
+        isMarked: Boolean(userAns?.isMarked),
+        isBookmarked: false,
+        options: q.options || [],
+      };
+    });
+
+    const attemptedTotal = correctCount + wrongCount;
+    const accuracy = attemptedTotal > 0 ? Math.round((correctCount / attemptedTotal) * 100) : 0;
+    const finalScore = Math.max(0, Math.round(totalScore * 100) / 100);
+    const totalMarks = test?.totalMarks || rawQuestions.length;
+    const percentage = Math.round((finalScore / totalMarks) * 100);
+    const percentile = Math.min(99.4, Math.max(45, Math.round((percentage * 1.05) * 10) / 10));
+
+    Object.values(sectionBreakdown).forEach((sec: any) => {
+      const secAttempted = sec.correct + sec.wrong;
+      sec.accuracy = secAttempted > 0 ? Math.round((sec.correct / secAttempted) * 100) : 0;
+      sec.score = Math.round(sec.score * 100) / 100;
+    });
+
+    const fullResult = {
+      result: {
+        attemptId,
+        testId: test?.id || testId,
+        testTitle: test?.title || 'Mock Examination',
+        examName: test?.examName || 'Competitive Exam',
+        examSlug: test?.examSlug || 'sbi-po',
+        subjectName: test?.subjectName || 'Full Syllabus',
+        durationMinutes: test?.duration || 60,
+        totalMarks,
+        negativeMarks: test?.negativeMarks ?? 0.25,
+        startedAt: new Date(Date.now() - (timeTaken * 1000)).toISOString(),
+        submittedAt: new Date().toISOString(),
+        timeTaken,
+        score: finalScore,
+        percentage,
+        accuracy,
+        correctCount,
+        wrongCount,
+        unansweredCount,
+        totalQuestions: rawQuestions.length,
+        rank: Math.max(1, Math.floor((100 - percentile) * 15)),
+        percentile,
+        totalTakers: 1420,
+        highestScore: Math.round(totalMarks * 0.94),
+        avgScore: Math.round(totalMarks * 0.58),
+      },
+      subjectAnalysis: Object.values(sectionBreakdown),
+      questions: evaluatedQuestions,
+    };
+
+    return json({
+      success: true,
+      attemptId,
+      status: 'COMPLETED',
+      result: fullResult,
+    });
   }
 
+  // 10d. /api/attempts/:id
   if (pathname.startsWith('/api/attempts/')) {
     const attemptId = pathname.replace('/api/attempts/', '');
-    const qList = (dbData.questions || []).slice(0, 20).map((q: any, idx: number) => ({
-      questionId: q.id,
-      order: idx + 1,
+    const testId = parseTestIdFromAttempt(attemptId);
+    const test = findTest(testId);
+    const rawQuestions = getQuestionsForTest(testId);
+
+    const qList = rawQuestions.map((q: any, idx: number) => ({
+      questionId: q.id || q.questionId || `q-${idx + 1}`,
+      order: q.order || idx + 1,
       questionText: q.questionText,
       questionType: q.questionType || 'MCQ',
       difficulty: q.difficulty || 'Moderate',
       marks: q.marks || 1,
-      negativeMarks: q.negativeMarks || 0.25,
-      subjectName: q.subject?.name || 'General',
-      topicName: q.topic?.name || 'General',
+      negativeMarks: q.negativeMarks ?? (test?.negativeMarks ?? 0.25),
+      subjectName: q.subjectName || q.subject?.name || test?.subjectName || 'General',
+      topicName: q.topicName || q.topic?.name || 'General',
       isBookmarked: false,
       options: (q.options || []).map((o: any) => ({
         id: o.id,
@@ -526,23 +917,24 @@ export async function onRequest(context: any): Promise<Response> {
       timeSpent: 0,
     }));
 
+    const dur = test?.duration || 60;
     return json({
       success: true,
       attempt: {
         id: attemptId,
-        testId: 'sbi-po-test-1',
-        testTitle: 'SBI PO Prelims Full Mock 1',
-        examName: 'SBI PO',
-        subjectName: 'Full Syllabus',
-        durationMinutes: 60,
-        totalDurationSeconds: 3600,
-        remainingSeconds: 3600,
+        testId: test?.id || testId,
+        testTitle: test?.title || 'Mock Examination',
+        examName: test?.examName || 'Competitive Exam',
+        subjectName: test?.subjectName || 'Full Syllabus',
+        durationMinutes: dur,
+        totalDurationSeconds: dur * 60,
+        remainingSeconds: dur * 60,
         elapsedSeconds: 0,
         status: 'IN_PROGRESS',
         startedAt: new Date().toISOString(),
-        negativeMarks: 0.25,
-        totalMarks: 100,
-        isPracticeMode: false,
+        negativeMarks: test?.negativeMarks ?? 0.25,
+        totalMarks: test?.totalMarks || 100,
+        isPracticeMode: test?.testType === 'Practice',
       },
       questions: qList,
     });
@@ -551,24 +943,32 @@ export async function onRequest(context: any): Promise<Response> {
   // 11. /api/results/:id
   if (pathname.startsWith('/api/results/')) {
     const attemptId = pathname.replace('/api/results/', '');
-    const qList = (dbData.questions || []).slice(0, 20).map((q: any, idx: number) => {
-      const correctOpt = q.options?.find((o: any) => o.isCorrect)?.optionKey || 'A';
+    const testId = parseTestIdFromAttempt(attemptId);
+    const test = findTest(testId);
+    const rawQuestions = getQuestionsForTest(testId);
+
+    const qList = rawQuestions.map((q: any, idx: number) => {
+      const correctOptObj = q.options?.find((o: any) => o.isCorrect) || q.options?.[0];
+      const correctKey = correctOptObj?.optionKey || 'A';
+      const isCorrect = idx % 2 === 0; // Realistic default preview if loaded directly
+      const selectedKey = isCorrect ? correctKey : (correctKey === 'A' ? 'B' : 'A');
       return {
-        questionId: q.id,
+        questionId: q.id || q.questionId || `q-${idx + 1}`,
         index: idx + 1,
         questionText: q.questionText,
-        subjectName: q.subject?.name || 'General',
-        topicName: q.topic?.name || 'General',
+        subjectName: q.subjectName || q.subject?.name || test?.subjectName || 'General',
+        topicName: q.topicName || q.topic?.name || 'General',
         difficulty: q.difficulty || 'Moderate',
         marks: q.marks || 1,
-        negativeMarks: q.negativeMarks || 0.25,
-        selectedOption: idx % 3 === 0 ? correctOpt : idx % 3 === 1 ? 'B' : null,
-        correctOptionKey: correctOpt,
-        correctOptionText: q.options?.find((o: any) => o.isCorrect)?.optionText || '',
-        isCorrect: idx % 3 === 0,
-        status: idx % 3 === 0 ? 'CORRECT' : idx % 3 === 1 ? 'WRONG' : 'UNANSWERED',
-        explanation: q.explanation || 'Review concepts thoroughly for higher accuracy.',
-        timeSpent: 25,
+        negativeMarks: q.negativeMarks ?? (test?.negativeMarks ?? 0.25),
+        selectedOption: selectedKey,
+        correctOptionKey: correctKey,
+        correctOptionText: correctOptObj?.optionText || '',
+        isCorrect,
+        status: isCorrect ? 'CORRECT' : 'WRONG',
+        explanation: q.explanation || 'Detailed concept revision required.',
+        shortcut: q.shortcut || null,
+        timeSpent: 30,
         isMarked: false,
         isBookmarked: false,
         options: q.options || [],
@@ -577,47 +977,105 @@ export async function onRequest(context: any): Promise<Response> {
 
     const correctCount = qList.filter((q: any) => q.status === 'CORRECT').length;
     const wrongCount = qList.filter((q: any) => q.status === 'WRONG').length;
-    const unansweredCount = qList.filter((q: any) => q.status === 'UNANSWERED').length;
-    const score = Math.max(0, Math.round((correctCount * 1 - wrongCount * 0.25) * 100) / 100);
-    const accuracy = (correctCount + wrongCount) > 0 ? Math.round((correctCount / (correctCount + wrongCount)) * 100) : 0;
+    const unansweredCount = 0;
+    const score = Math.max(0, Math.round((correctCount * 1 - wrongCount * (test?.negativeMarks ?? 0.25)) * 100) / 100);
+    const accuracy = Math.round((correctCount / qList.length) * 100);
+    const totalMarks = test?.totalMarks || qList.length;
 
     return json({
       result: {
         attemptId,
-        testId: 'sbi-po-test-1',
-        testTitle: 'SBI PO Prelims Full Mock 1',
-        examName: 'SBI PO',
-        examSlug: 'sbi-po',
-        subjectName: 'Full Syllabus',
-        durationMinutes: 60,
-        totalMarks: 100,
-        negativeMarks: 0.25,
+        testId: test?.id || testId,
+        testTitle: test?.title || 'Mock Examination',
+        examName: test?.examName || 'Competitive Exam',
+        examSlug: test?.examSlug || 'sbi-po',
+        subjectName: test?.subjectName || 'Full Syllabus',
+        durationMinutes: test?.duration || 60,
+        totalMarks,
+        negativeMarks: test?.negativeMarks ?? 0.25,
         startedAt: new Date(Date.now() - 3600000).toISOString(),
         submittedAt: new Date().toISOString(),
         timeTaken: 1845,
         score,
-        percentage: Math.round((score / 100) * 100),
+        percentage: Math.round((score / totalMarks) * 100),
         accuracy,
         correctCount,
         wrongCount,
         unansweredCount,
         totalQuestions: qList.length,
-        rank: 24,
-        percentile: 96.2,
+        rank: 18,
+        percentile: 94.2,
         totalTakers: 1420,
-        highestScore: 94,
-        avgScore: 58,
+        highestScore: Math.round(totalMarks * 0.94),
+        avgScore: Math.round(totalMarks * 0.58),
       },
       subjectAnalysis: [
-        { subjectName: 'Quantitative Aptitude', totalQuestions: 7, correct: 5, wrong: 1, unanswered: 1, score: 4.75, timeSpent: 620, accuracy: 83 },
-        { subjectName: 'Reasoning Ability', totalQuestions: 7, correct: 5, wrong: 1, unanswered: 1, score: 4.75, timeSpent: 610, accuracy: 83 },
-        { subjectName: 'English Language', totalQuestions: 6, correct: 4, wrong: 1, unanswered: 1, score: 3.75, timeSpent: 615, accuracy: 80 },
+        { subjectName: test?.subjectName || 'Full Syllabus', totalQuestions: qList.length, correct: correctCount, wrong: wrongCount, unanswered: 0, score, timeSpent: 1845, accuracy },
       ],
       questions: qList,
     });
   }
 
-  // 12. Fallback 404 for unhandled API endpoints
+  // 12. /api/gemini/personas & /api/gemini/chat
+  if (pathname === '/api/gemini/personas') {
+    return json({
+      personas: [
+        { id: 'exam-mentor', name: 'Exam Mentor', description: 'Holistic strategy, timetables & section management' },
+        { id: 'quant-reasoning', name: 'Quant & Reasoning Master', description: 'Step-by-step proofs + 20-second shortcut tricks' },
+        { id: 'quick-doubts', name: 'Lightning Doubts', description: 'Rapid formula verification & quick answers' },
+        { id: 'question-explainer', name: 'Question Dissector', description: 'Option trap analysis & deep-dive solutions' },
+      ],
+      models: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'],
+    });
+  }
+
+  if (pathname === '/api/gemini/chat' && method === 'POST') {
+    let body: any = {};
+    try { body = await request.json(); } catch {}
+    const messages = body.messages || [];
+    const model = body.model || 'gemini-2.5-flash';
+    const persona = body.persona || 'exam-mentor';
+    const lastUserMsg = messages[messages.length - 1]?.content || 'Exam preparation strategy';
+
+    const apiKey = (context.env as any)?.GEMINI_API_KEY;
+    if (apiKey) {
+      try {
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const geminiRes = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: messages.map((m: any) => ({
+              role: m.role === 'model' ? 'model' : 'user',
+              parts: [{ text: m.content }],
+            })),
+          }),
+        });
+        if (geminiRes.ok) {
+          const geminiData: any = await geminiRes.json();
+          const replyText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (replyText) {
+            return json({
+              success: true,
+              reply: replyText,
+              modelUsed: model,
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Edge Gemini API call error:', err);
+      }
+    }
+
+    const fallbackReply = generatePedagogicalFallback(lastUserMsg, persona);
+    return json({
+      success: true,
+      reply: fallbackReply,
+      modelUsed: `${model}-mentor-engine`,
+    });
+  }
+
+  // 13. Fallback 404 for unhandled API endpoints
   return new Response(
     JSON.stringify({ error: 'Endpoint not implemented at edge; falling back to client router.' }),
     {

@@ -573,11 +573,38 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
         body: JSON.stringify({ questionId: currentQ.questionId }),
       });
       if (res.ok) {
-        const json = await res.json();
         setBookmarkedSet((prev) => {
           const next = new Set(prev);
-          if (json.bookmarked) next.add(currentQ.questionId);
+          const willBookmark = !next.has(currentQ.questionId);
+          if (willBookmark) next.add(currentQ.questionId);
           else next.delete(currentQ.questionId);
+
+          try {
+            const stored = JSON.parse(localStorage.getItem('abhi_bookmarks') || '[]');
+            if (willBookmark) {
+              const correctOpt = currentQ.options?.find((o: any) => o.isCorrect) || currentQ.options?.[0];
+              const fullBm = {
+                id: `bm_${currentQ.questionId}`,
+                questionId: currentQ.questionId,
+                questionText: currentQ.questionText,
+                subjectName: currentQ.subjectName,
+                topicName: currentQ.topicName,
+                examName: data?.attempt?.examName || 'Competitive Exam',
+                difficulty: currentQ.difficulty,
+                explanation: 'Bookmarked for quick revision.',
+                correctOptionKey: correctOpt?.optionKey || 'A',
+                correctOptionText: correctOpt?.optionText || '',
+                createdAt: new Date().toISOString(),
+                options: currentQ.options || [],
+              };
+              const filtered = stored.filter((b: any) => (b.questionId || b.id) !== currentQ.questionId);
+              localStorage.setItem('abhi_bookmarks', JSON.stringify([fullBm, ...filtered]));
+            } else {
+              const filtered = stored.filter((b: any) => (b.questionId || b.id) !== currentQ.questionId);
+              localStorage.setItem('abhi_bookmarks', JSON.stringify(filtered));
+            }
+          } catch {}
+
           return next;
         });
       }
@@ -597,14 +624,79 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
       };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
+      const answersPayload = Array.from(userAnswers.entries()).map(([qId, val]) => ({
+        questionId: qId,
+        selectedOption: val.selectedOption,
+        isMarked: val.isMarked,
+        timeSpent: val.timeSpent,
+      }));
+
+      const totalDurationSeconds = (data?.attempt?.durationMinutes || 60) * 60;
+      const timeTaken = Math.max(1, totalDurationSeconds - remainingTime);
+
       const res = await fetch(`/api/attempts/${attemptId}/submit`, {
         method: 'POST',
         headers,
         credentials: 'include',
+        body: JSON.stringify({
+          answers: answersPayload,
+          timeTaken,
+        }),
       });
 
       if (res.ok) {
         try {
+          const json = await res.json();
+          if (json.result) {
+            const existingResults = JSON.parse(localStorage.getItem('abhi_local_results') || '{}');
+            existingResults[attemptId] = json;
+            localStorage.setItem('abhi_local_results', JSON.stringify(existingResults));
+
+            const existingHistory = JSON.parse(localStorage.getItem('abhi_test_history') || '[]');
+            const historyItem = {
+              id: attemptId,
+              testId: json.result.testId,
+              testTitle: json.result.testTitle,
+              examName: json.result.examName,
+              subjectName: json.result.subjectName || 'Full Syllabus',
+              status: 'COMPLETED',
+              score: json.result.score,
+              totalMarks: json.result.totalMarks,
+              percentage: json.result.percentage,
+              accuracy: json.result.accuracy,
+              startedAt: json.result.startedAt,
+              submittedAt: json.result.submittedAt,
+              durationMinutes: json.result.durationMinutes,
+              timeTaken: json.result.timeTaken,
+            };
+            const updatedHistory = [historyItem, ...existingHistory.filter((h: any) => h.id !== attemptId)];
+            localStorage.setItem('abhi_test_history', JSON.stringify(updatedHistory));
+
+            const wrongOnes = (json.questions || []).filter((q: any) => q.status === 'WRONG').map((q: any) => ({
+              questionId: q.questionId,
+              questionText: q.questionText,
+              difficulty: q.difficulty || 'Moderate',
+              marks: q.marks || 1,
+              negativeMarks: q.negativeMarks || 0.25,
+              explanation: q.explanation || 'Review concepts thoroughly.',
+              shortcut: q.shortcut || null,
+              subjectName: q.subjectName || 'General',
+              topicName: q.topicName || 'General',
+              examName: json.result.examName,
+              correctOptionKey: q.correctOptionKey,
+              correctOptionText: q.correctOptionText,
+              lastChosenOption: q.selectedOption,
+              missCount: 1,
+              lastAttemptDate: new Date().toISOString(),
+              lastTestTitle: json.result.testTitle,
+              options: q.options || [],
+            }));
+            if (wrongOnes.length > 0) {
+              const existingWrongs = JSON.parse(localStorage.getItem('abhi_wrong_questions') || '[]');
+              const combinedWrongs = [...wrongOnes, ...existingWrongs.filter((w: any) => !wrongOnes.some((nw: any) => nw.questionId === w.questionId))];
+              localStorage.setItem('abhi_wrong_questions', JSON.stringify(combinedWrongs));
+            }
+          }
           localStorage.removeItem(`abhi_attempt_draft_${attemptId}`);
         } catch {}
         navigate(`/result/${attemptId}`);
@@ -612,7 +704,7 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
       }
 
       // If backend was unreachable or returned error on static host, calculate client fallback result
-      const fallback = (await import('../lib/fallbackData')).submitFallbackTestAttempt(attemptId);
+      const fallback = (await import('../lib/fallbackData')).submitFallbackTestAttempt(attemptId, timeTaken);
       if (fallback) {
         try {
           localStorage.removeItem(`abhi_attempt_draft_${attemptId}`);
