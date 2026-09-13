@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { score } from '../server/scoring';
+import { score, scoreItemizedQuestions } from '../server/scoring';
 
 test('Scoring Engine Unit Tests', async (t) => {
   await t.test('All correct answers yields maximum score and 100% accuracy', () => {
@@ -48,5 +48,25 @@ test('Scoring Engine Unit Tests', async (t) => {
     assert.equal(result.score, 0);
     assert.equal(result.accuracy, 0);
     assert.equal(result.percentage, 0);
+  });
+
+  await t.test('Itemized scoring accurately calculates variable question marks and penalties', () => {
+    const items = [
+      { questionId: 'q1', isCorrect: true, marks: 2.0, negativeMarks: 0.5 },
+      { questionId: 'q2', isCorrect: true, marks: 1.0, negativeMarks: 0.25 },
+      { questionId: 'q3', isCorrect: false, marks: 2.0, negativeMarks: 0.5 },
+      { questionId: 'q4', isCorrect: null, marks: 1.0, negativeMarks: 0.25 },
+    ];
+    // Score: +2.0 + 1.0 - 0.5 = 2.5
+    // Total marks: 2 + 1 + 2 + 1 = 6.0
+    // Percentage: 2.5 / 6.0 * 100 = 41.67%
+    // Attempted: 3 (2 correct, 1 wrong), Accuracy: 2/3 * 100 = 66.67%
+    const result = scoreItemizedQuestions(items, 6.0);
+    assert.equal(result.score, 2.5);
+    assert.equal(result.accuracy, 66.67);
+    assert.equal(result.percentage, 41.67);
+    assert.equal(result.correctCount, 2);
+    assert.equal(result.wrongCount, 1);
+    assert.equal(result.unansweredCount, 1);
   });
 });

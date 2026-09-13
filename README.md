@@ -16,7 +16,7 @@
 [![SQLite](https://img.shields.io/badge/SQLite-Database-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 [![Google Gemini API](https://img.shields.io/badge/Google%20Gemini-2.4%20SDK-8E75B2?logo=google&logoColor=white)](https://ai.google.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38B2AC?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![Tests Passing](https://img.shields.io/badge/Tests-24%2F24%20Passing-brightgreen?logo=checkmarx&logoColor=white)]()
+[![Tests Passing](https://img.shields.io/badge/Tests-36%2F36%20Passing-brightgreen?logo=checkmarx&logoColor=white)]()
 [![Code Quality](https://img.shields.io/badge/TypeCheck-0%20Errors-emerald)]()
 [![Security](https://img.shields.io/badge/Security-Hardened-blueviolet?logo=shield&logoColor=white)]()
 

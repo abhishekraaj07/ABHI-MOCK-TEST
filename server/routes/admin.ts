@@ -8,6 +8,82 @@ const router = Router();
 router.use(authenticate);
 router.use(requireAdmin);
 
+async function logAdminAction(
+  req: AuthRequest,
+  action: string,
+  targetType: string,
+  targetId?: string | null,
+  metadata?: any
+) {
+  try {
+    const adminUserId = req.user?.id;
+    if (!adminUserId) return;
+    const ipAddress = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || null;
+    const userAgent = (req.headers['user-agent'] as string) || null;
+
+    await prisma.adminAuditLog.create({
+      data: {
+        adminUserId,
+        action,
+        targetType,
+        targetId: targetId || null,
+        metadata: metadata ? JSON.stringify(metadata) : null,
+        ipAddress: typeof ipAddress === 'string' ? ipAddress.slice(0, 100) : null,
+        userAgent: typeof userAgent === 'string' ? userAgent.slice(0, 255) : null,
+      },
+    });
+  } catch (err) {
+    console.error('Failed to write admin audit log:', err);
+  }
+}
+
+// GET /api/admin/audit-logs - audit history
+router.get('/audit-logs', async (req: AuthRequest, res: Response) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25));
+    const skip = (page - 1) * limit;
+
+    const [total, logs] = await Promise.all([
+      prisma.adminAuditLog.count(),
+      prisma.adminAuditLog.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          admin: { select: { id: true, name: true, email: true } },
+        },
+      }),
+    ]);
+
+    return res.json({
+      success: true,
+      logs: logs.map((l) => ({
+        id: l.id,
+        adminUserId: l.adminUserId,
+        adminName: l.admin?.name || 'System',
+        adminEmail: l.admin?.email || 'unknown',
+        action: l.action,
+        targetType: l.targetType,
+        targetId: l.targetId,
+        metadata: l.metadata ? JSON.parse(l.metadata) : null,
+        ipAddress: l.ipAddress,
+        userAgent: l.userAgent,
+        createdAt: l.createdAt,
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching admin audit logs:', error);
+    return res.status(500).json({ error: 'Failed to retrieve admin audit logs.' });
+  }
+});
+
 // GET /api/admin/stats - overall metrics (§14)
 router.get('/stats', async (_req: AuthRequest, res: Response) => {
   try {
@@ -113,6 +189,40 @@ router.get('/users', async (_req: AuthRequest, res: Response) => {
   }
 });
 
+// PUT /api/admin/users/:id/role
+router.put('/users/:id/role', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    if (role !== 'USER' && role !== 'ADMIN') {
+      return res.status(400).json({ error: 'Invalid role. Must be USER or ADMIN.' });
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id } });
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: { role },
+      select: { id: true, name: true, email: true, role: true, updatedAt: true },
+    });
+
+    await logAdminAction(req, 'UPDATE_USER_ROLE', 'User', id, {
+      oldRole: targetUser.role,
+      newRole: role,
+      targetEmail: targetUser.email,
+    });
+
+    return res.json({ success: true, user: updatedUser });
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    return res.status(500).json({ error: 'Failed to update user role.' });
+  }
+});
+
 // --- EXAMS CRUD ---
 // GET /api/admin/exams
 router.get('/exams', async (_req: AuthRequest, res: Response) => {
@@ -148,6 +258,9 @@ router.post('/exams', async (req: AuthRequest, res: Response) => {
         isActive: isActive !== undefined ? Boolean(isActive) : true,
       },
     });
+
+    await logAdminAction(req, 'CREATE_EXAM', 'Exam', created.id, { name: created.name, slug: created.slug });
+
     return res.status(201).json({ exam: created });
   } catch (error: any) {
     if (error.code === 'P2002') {
@@ -174,6 +287,9 @@ router.put('/exams/:id', async (req: AuthRequest, res: Response) => {
         isActive: isActive !== undefined ? Boolean(isActive) : undefined,
       },
     });
+
+    await logAdminAction(req, 'UPDATE_EXAM', 'Exam', updated.id, { name: updated.name, slug: updated.slug });
+
     return res.json({ exam: updated });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to update exam.' });
@@ -184,7 +300,11 @@ router.put('/exams/:id', async (req: AuthRequest, res: Response) => {
 router.delete('/exams/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const existing = await prisma.exam.findUnique({ where: { id }, select: { name: true } });
     await prisma.exam.delete({ where: { id } });
+
+    await logAdminAction(req, 'DELETE_EXAM', 'Exam', id, { name: existing?.name });
+
     return res.json({ success: true, message: 'Exam deleted.' });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to delete exam.' });
@@ -228,6 +348,9 @@ router.post('/subjects', async (req: AuthRequest, res: Response) => {
         description: description || '',
       },
     });
+
+    await logAdminAction(req, 'CREATE_SUBJECT', 'Subject', created.id, { name: created.name });
+
     return res.status(201).json({ subject: created });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to create subject.' });
@@ -238,7 +361,11 @@ router.post('/subjects', async (req: AuthRequest, res: Response) => {
 router.delete('/subjects/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const existing = await prisma.subject.findUnique({ where: { id }, select: { name: true } });
     await prisma.subject.delete({ where: { id } });
+
+    await logAdminAction(req, 'DELETE_SUBJECT', 'Subject', id, { name: existing?.name });
+
     return res.json({ success: true, message: 'Subject deleted.' });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to delete subject.' });
@@ -282,6 +409,9 @@ router.post('/topics', async (req: AuthRequest, res: Response) => {
         description: description || '',
       },
     });
+
+    await logAdminAction(req, 'CREATE_TOPIC', 'Topic', created.id, { name: created.name });
+
     return res.status(201).json({ topic: created });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to create topic.' });
@@ -292,7 +422,11 @@ router.post('/topics', async (req: AuthRequest, res: Response) => {
 router.delete('/topics/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const existing = await prisma.topic.findUnique({ where: { id }, select: { name: true } });
     await prisma.topic.delete({ where: { id } });
+
+    await logAdminAction(req, 'DELETE_TOPIC', 'Topic', id, { name: existing?.name });
+
     return res.json({ success: true, message: 'Topic deleted.' });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to delete topic.' });
@@ -369,6 +503,8 @@ router.post('/tests', async (req: AuthRequest, res: Response) => {
       }
     }
 
+    await logAdminAction(req, 'CREATE_TEST', 'Test', test.id, { title: test.title });
+
     return res.status(201).json({ test });
   } catch (error) {
     console.error('Error creating test:', error);
@@ -426,6 +562,8 @@ router.put('/tests/:id', async (req: AuthRequest, res: Response) => {
       }
     }
 
+    await logAdminAction(req, 'UPDATE_TEST', 'Test', updated.id, { title: updated.title });
+
     return res.json({ test: updated });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to update test.' });
@@ -436,7 +574,11 @@ router.put('/tests/:id', async (req: AuthRequest, res: Response) => {
 router.delete('/tests/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const existing = await prisma.test.findUnique({ where: { id }, select: { title: true } });
     await prisma.test.delete({ where: { id } });
+
+    await logAdminAction(req, 'DELETE_TEST', 'Test', id, { title: existing?.title });
+
     return res.json({ success: true, message: 'Test deleted.' });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to delete test.' });
@@ -539,6 +681,8 @@ router.post('/questions', async (req: AuthRequest, res: Response) => {
       },
     });
 
+    await logAdminAction(req, 'CREATE_QUESTION', 'Question', created.id);
+
     return res.status(201).json({ question: created });
   } catch (error) {
     console.error('Error creating question:', error);
@@ -595,6 +739,8 @@ router.put('/questions/:id', async (req: AuthRequest, res: Response) => {
       include: { options: true, exam: true, subject: true },
     });
 
+    await logAdminAction(req, 'UPDATE_QUESTION', 'Question', updated.id);
+
     return res.json({ question: fullQuestion });
   } catch (error) {
     console.error('Error updating question:', error);
@@ -637,6 +783,8 @@ router.post('/questions/:id/duplicate', async (req: AuthRequest, res: Response) 
       include: { options: true },
     });
 
+    await logAdminAction(req, 'DUPLICATE_QUESTION', 'Question', duplicated.id, { sourceId: id });
+
     return res.status(201).json({ question: duplicated, message: 'Question duplicated successfully.' });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to duplicate question.' });
@@ -648,6 +796,9 @@ router.delete('/questions/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     await prisma.question.delete({ where: { id } });
+
+    await logAdminAction(req, 'DELETE_QUESTION', 'Question', id);
+
     return res.json({ success: true, message: 'Question deleted successfully.' });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to delete question.' });
@@ -835,6 +986,12 @@ router.post('/questions/import', async (req: AuthRequest, res: Response) => {
         errors.push(`Row ${itemNum}: Database insertion error (${err.message}).`);
       }
     }
+
+    await logAdminAction(req, 'IMPORT_QUESTIONS', 'Question', null, {
+      importedCount,
+      duplicateCount,
+      failedCount,
+    });
 
     return res.status(200).json({
       success: true,

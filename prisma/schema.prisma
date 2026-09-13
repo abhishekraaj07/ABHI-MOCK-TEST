@@ -19,6 +19,7 @@ model User {
   bookmarks              Bookmark[]
   reports                QuestionReport[]
   dailyChallengeAttempts DailyChallengeAttempt[]
+  adminAuditLogs         AdminAuditLog[]
 }
 
 model Exam {
@@ -226,3 +227,21 @@ model DailyChallengeAttempt {
   @@unique([challengeId, userId])
   @@index([userId])
 }
+
+model AdminAuditLog {
+  id          String   @id @default(uuid())
+  adminUserId String
+  admin       User     @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  action      String   // CREATE_EXAM, UPDATE_EXAM, DELETE_EXAM, CREATE_TEST, UPDATE_TEST, DELETE_TEST, CREATE_QUESTION, UPDATE_QUESTION, DELETE_QUESTION, UPDATE_USER_ROLE
+  targetType  String   // Exam, Test, Question, User, Subject, Topic
+  targetId    String?
+  metadata    String?  // JSON formatted details
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([adminUserId])
+  @@index([action])
+  @@index([createdAt])
+}
+

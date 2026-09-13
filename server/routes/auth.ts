@@ -8,35 +8,36 @@ import {
   AUTH_COOKIE_NAME,
   AUTH_COOKIE_OPTIONS,
 } from '../middleware/auth';
+import {
+  RegisterSchema,
+  LoginSchema,
+  ChangePasswordSchema,
+  UpdateProfileSchema,
+} from '../validators/schemas';
 
 const router = Router();
 
 // POST /api/auth/register
 router.post('/register', async (req: AuthRequest, res: Response) => {
   try {
-    const { name, email, password, confirmPassword } = req.body;
+    const parseResult = RegisterSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      const firstError = parseResult.error.issues[0];
+      let code = 'VALIDATION_ERROR';
+      if (firstError.message.includes('at least 8')) code = 'WEAK_PASSWORD';
+      else if (firstError.message.includes('Passwords do not match')) code = 'PASSWORD_MISMATCH';
+      else if (firstError.message.includes('required') || firstError.message.includes('Invalid email')) code = 'MISSING_FIELDS';
 
-    if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
-        error: { code: 'MISSING_FIELDS', message: 'Name, email, and password are required.' },
+        error: {
+          code,
+          message: parseResult.error.issues.map(e => e.message).join(', '),
+        },
       });
     }
 
-    if (typeof password !== 'string' || password.length < 8) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'WEAK_PASSWORD', message: 'Password must be at least 8 characters long.' },
-      });
-    }
-
-    if (confirmPassword && password !== confirmPassword) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'PASSWORD_MISMATCH', message: 'Passwords do not match.' },
-      });
-    }
-
+    const { name, email, password } = parseResult.data;
     const normalizedEmail = email.trim().toLowerCase();
     const existingUser = await prisma.user.findUnique({
       where: { email: normalizedEmail },
@@ -88,15 +89,15 @@ router.post('/register', async (req: AuthRequest, res: Response) => {
 // POST /api/auth/login
 router.post('/login', async (req: AuthRequest, res: Response) => {
   try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
+    const parseResult = LoginSchema.safeParse(req.body);
+    if (!parseResult.success) {
       return res.status(400).json({
         success: false,
         error: { code: 'MISSING_CREDENTIALS', message: 'Email and password are required.' },
       });
     }
 
+    const { email, password } = parseResult.data;
     const normalizedEmail = email.trim().toLowerCase();
     const user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
@@ -303,17 +304,18 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
 // PUT /api/auth/profile
 router.put('/profile', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { name } = req.body;
-    if (!name || !name.trim()) {
+    const parseResult = UpdateProfileSchema.safeParse(req.body);
+    if (!parseResult.success) {
       return res.status(400).json({
         success: false,
-        error: { code: 'INVALID_NAME', message: 'Name cannot be empty.' },
+        error: { code: 'INVALID_NAME', message: parseResult.error.issues[0].message },
       });
     }
 
+    const { name } = parseResult.data;
     const updated = await prisma.user.update({
       where: { id: req.user!.id },
-      data: { name: name.trim() },
+      data: { name },
       select: { id: true, name: true, email: true, role: true, createdAt: true },
     });
 
@@ -329,20 +331,17 @@ router.put('/profile', authenticate, async (req: AuthRequest, res: Response) => 
 // PUT or POST /api/auth/change-password
 const handleChangePassword = async (req: AuthRequest, res: Response) => {
   try {
-    const { currentPassword, newPassword } = req.body;
-    if (!currentPassword || !newPassword) {
+    const parseResult = ChangePasswordSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      const firstError = parseResult.error.issues[0];
+      const code = firstError.message.includes('at least 8') ? 'WEAK_PASSWORD' : 'MISSING_FIELDS';
       return res.status(400).json({
         success: false,
-        error: { code: 'MISSING_FIELDS', message: 'Current password and new password are required.' },
+        error: { code, message: firstError.message },
       });
     }
 
-    if (typeof newPassword !== 'string' || newPassword.length < 8) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'WEAK_PASSWORD', message: 'New password must be at least 8 characters long.' },
-      });
-    }
+    const { currentPassword, newPassword } = parseResult.data;
 
     const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
     if (!user) {

@@ -1,7 +1,8 @@
 import { Router, Response } from 'express';
 import { prisma } from '../db';
 import { AuthRequest, authenticate } from '../middleware/auth';
-import { score } from '../scoring';
+import { score, scoreItemizedQuestions } from '../scoring';
+import { SaveAnswerSchema } from '../validators/schemas';
 
 const router = Router();
 
@@ -194,19 +195,31 @@ router.post('/:id/answer', authenticate, async (req: AuthRequest, res: Response)
   try {
     const { id } = req.params;
     const userId = req.user!.id;
-    const { questionId, selectedOption, isMarked, timeSpent } = req.body;
 
-    if (!questionId) {
+    // Validate request body via Zod
+    const parseResult = SaveAnswerSchema.safeParse(req.body);
+    if (!parseResult.success) {
       return res.status(400).json({
         success: false,
-        error: { code: 'MISSING_QUESTION_ID', message: 'Question ID is required.' },
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: parseResult.error.issues.map(e => e.message).join(', '),
+        },
       });
     }
+
+    const { questionId, selectedOption, isMarked, timeSpent } = parseResult.data;
 
     const attempt = await prisma.attempt.findUnique({
       where: { id },
       include: {
-        test: { select: { duration: true, testType: true } },
+        test: {
+          select: {
+            duration: true,
+            testType: true,
+            testQuestions: { select: { questionId: true } },
+          },
+        },
       },
     });
 
@@ -228,6 +241,15 @@ router.post('/:id/answer', authenticate, async (req: AuthRequest, res: Response)
       return res.status(400).json({
         success: false,
         error: { code: 'ATTEMPT_CLOSED', message: 'This test has already been completed and submitted.' },
+      });
+    }
+
+    // Verify question actually belongs to this test
+    const isValidQuestion = attempt.test.testQuestions.some(tq => tq.questionId === questionId);
+    if (!isValidQuestion) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_QUESTION', message: 'Question does not belong to this test.' },
       });
     }
 
@@ -347,11 +369,7 @@ router.post('/:id/submit', authenticate, async (req: AuthRequest, res: Response)
 
     const answerMap = new Map(attempt.answers.map((a) => [a.questionId, a]));
 
-    let correctCount = 0;
-    let wrongCount = 0;
-    let unansweredCount = 0;
-    const marksPerQ = test.testQuestions[0]?.question.marks ?? 1.0;
-    const negativeMarksPerQ = typeof test.negativeMarks === 'number' ? test.negativeMarks : 0.25;
+    const defaultTestNeg = typeof test.negativeMarks === 'number' ? test.negativeMarks : 0.25;
 
     const answerUpdates: {
       questionId: string;
@@ -360,15 +378,30 @@ router.post('/:id/submit', authenticate, async (req: AuthRequest, res: Response)
       marksObtained: number;
     }[] = [];
 
-    // Evaluate answers server-side
+    const scoringItems: {
+      questionId: string;
+      isCorrect: boolean | null;
+      marks: number;
+      negativeMarks?: number;
+    }[] = [];
+
+    // Evaluate answers server-side with per-question marks and negativeMarks
     for (const tq of test.testQuestions) {
       const q = tq.question;
       const ans = answerMap.get(q.id);
       const correctOption = q.options.find((o) => o.isCorrect);
       const userSelected = ans?.selectedOption || null;
 
+      const qMarks = typeof q.marks === 'number' && !isNaN(q.marks) ? q.marks : 1.0;
+      const qNeg = typeof q.negativeMarks === 'number' && !isNaN(q.negativeMarks) ? q.negativeMarks : defaultTestNeg;
+
       if (!userSelected) {
-        unansweredCount++;
+        scoringItems.push({
+          questionId: q.id,
+          isCorrect: null,
+          marks: qMarks,
+          negativeMarks: qNeg,
+        });
         answerUpdates.push({
           questionId: q.id,
           selectedOption: null,
@@ -376,33 +409,36 @@ router.post('/:id/submit', authenticate, async (req: AuthRequest, res: Response)
           marksObtained: 0,
         });
       } else if (correctOption && userSelected === correctOption.optionKey) {
-        correctCount++;
+        scoringItems.push({
+          questionId: q.id,
+          isCorrect: true,
+          marks: qMarks,
+          negativeMarks: qNeg,
+        });
         answerUpdates.push({
           questionId: q.id,
           selectedOption: userSelected,
           isCorrect: true,
-          marksObtained: q.marks,
+          marksObtained: qMarks,
         });
       } else {
-        wrongCount++;
+        scoringItems.push({
+          questionId: q.id,
+          isCorrect: false,
+          marks: qMarks,
+          negativeMarks: qNeg,
+        });
         answerUpdates.push({
           questionId: q.id,
           selectedOption: userSelected,
           isCorrect: false,
-          marksObtained: -negativeMarksPerQ,
+          marksObtained: -qNeg,
         });
       }
     }
 
-    // Centralized scoring function (§Phase 10)
-    const scoreResult = score(
-      correctCount,
-      wrongCount,
-      marksPerQ,
-      negativeMarksPerQ,
-      test.totalMarks,
-      test.testQuestions.length
-    );
+    // Centralized high-precision scoring engine (§Phase 10)
+    const scoreResult = scoreItemizedQuestions(scoringItems, test.totalMarks);
 
     // Atomically persist all answer updates and final attempt score via transaction (§Phase 11)
     const updatedAttempt = await prisma.$transaction(async (tx) => {
@@ -439,9 +475,9 @@ router.post('/:id/submit', authenticate, async (req: AuthRequest, res: Response)
           score: scoreResult.score,
           percentage: scoreResult.percentage,
           accuracy: scoreResult.accuracy,
-          correctCount,
-          wrongCount,
-          unansweredCount,
+          correctCount: scoreResult.correctCount,
+          wrongCount: scoreResult.wrongCount,
+          unansweredCount: scoreResult.unansweredCount,
         },
       });
     });
