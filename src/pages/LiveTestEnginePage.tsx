@@ -228,14 +228,17 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
             // Resync recovered responses to server in the background
             if (hasUnsynced) {
               const token = localStorage.getItem('abhi_token');
+              const authHeaders: Record<string, string> = {
+                'Content-Type': 'application/json',
+              };
+              if (token) authHeaders['Authorization'] = `Bearer ${token}`;
+
               draftList.forEach((d) => {
                 if (d.selectedOption) {
                   fetch(`/api/attempts/${attemptId}/answer`, {
                     method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      Authorization: `Bearer ${token}`,
-                    },
+                    headers: authHeaders,
+                    credentials: 'include',
                     body: JSON.stringify(d),
                   }).catch(() => {});
                 }
@@ -364,12 +367,15 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
 
     try {
       const token = localStorage.getItem('abhi_token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch(`/api/attempts/${attemptId}/answer`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
+        credentials: 'include',
         body: JSON.stringify({
           questionId: pending.questionId,
           selectedOption: pending.selectedOption,
@@ -421,12 +427,15 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
       if (pendingAnswerRef.current) {
         const { questionId, selectedOption, isMarked, timeSpent } = pendingAnswerRef.current;
         const token = localStorage.getItem('abhi_token');
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
         fetch(`/api/attempts/${attemptId}/answer`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          headers,
+          credentials: 'include',
           body: JSON.stringify({ questionId, selectedOption, isMarked, timeSpent }),
           keepalive: true,
         }).catch(() => {});
@@ -551,14 +560,16 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
     const currentQ = getCurrentQuestion();
     if (!currentQ) return;
     const token = localStorage.getItem('abhi_token');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
 
     try {
       const res = await fetch('/api/bookmarks', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
+        credentials: 'include',
         body: JSON.stringify({ questionId: currentQ.questionId }),
       });
       if (res.ok) {

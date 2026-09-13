@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Flag, X, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 
 interface QuestionReportModalProps {
   isOpen: boolean;
@@ -25,11 +26,12 @@ export const QuestionReportModal: React.FC<QuestionReportModalProps> = ({
   testId,
   questionText,
 }) => {
-  const [reason, setReason] = useState<string>('wrong_answer');
-  const [description, setDescription] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const { user, guestLogin } = useAuth();
+  const [reason, setReason] = useState<string>(REPORT_REASONS[0].value);
+  const [description, setDescription] = useState<string>('');
+  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [success, setSuccess] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   if (!isOpen) return null;
 
@@ -42,20 +44,22 @@ export const QuestionReportModal: React.FC<QuestionReportModalProps> = ({
       return;
     }
 
-    const token = localStorage.getItem('abhi_token');
-    if (!token) {
-      setError('You must be logged in to report a question.');
-      return;
+    if (!user) {
+      await guestLogin();
     }
 
     setSubmitting(true);
     try {
+      const token = localStorage.getItem('abhi_token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await apiFetch('/api/reports', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
+        credentials: 'include',
         body: JSON.stringify({
           questionId,
           testId,

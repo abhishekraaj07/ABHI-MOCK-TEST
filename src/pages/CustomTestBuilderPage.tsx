@@ -14,6 +14,7 @@ import {
   BookOpen,
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ExamOption {
   id: string;
@@ -25,6 +26,7 @@ interface ExamOption {
 
 export const CustomTestBuilderPage: React.FC = () => {
   const { navigate } = useRouter();
+  const { user, guestLogin } = useAuth();
 
   const [exams, setExams] = useState<ExamOption[]>([]);
   const [loadingExams, setLoadingExams] = useState(true);
@@ -44,15 +46,14 @@ export const CustomTestBuilderPage: React.FC = () => {
       try {
         const res = await apiFetch('/api/exams');
         if (res.ok) {
-          const data = await res.json();
-          const examList = data.exams || [];
-          setExams(examList);
-          if (examList.length > 0) {
-            setSelectedExamId(examList[0].id);
+          const json = await res.json();
+          setExams(json.exams || []);
+          if (json.exams?.length > 0) {
+            setSelectedExamId(json.exams[0].id);
           }
         }
       } catch (e) {
-        console.error('Failed to load exams', e);
+        console.error('Failed to load exams list:', e);
       } finally {
         setLoadingExams(false);
       }
@@ -67,10 +68,8 @@ export const CustomTestBuilderPage: React.FC = () => {
     e.preventDefault();
     setError(null);
 
-    const token = localStorage.getItem('abhi_token');
-    if (!token) {
-      navigate(`/login?redirect=/custom-test`);
-      return;
+    if (!user) {
+      await guestLogin();
     }
 
     if (!selectedExamId) {
@@ -81,12 +80,16 @@ export const CustomTestBuilderPage: React.FC = () => {
     setCreating(true);
 
     try {
+      const token = localStorage.getItem('abhi_token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await apiFetch('/api/tests/custom', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
+        credentials: 'include',
         body: JSON.stringify({
           examId: selectedExamId,
           subjectId: selectedSubjectId !== 'All' ? selectedSubjectId : undefined,

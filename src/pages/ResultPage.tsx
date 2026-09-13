@@ -156,13 +156,15 @@ export const ResultPage: React.FC<{ attemptId: string }> = ({ attemptId }) => {
   const handleToggleBookmark = async (qId: string) => {
     try {
       const token = localStorage.getItem('abhi_token');
-      if (!token) return;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch('/api/bookmarks', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
+        credentials: 'include',
         body: JSON.stringify({ questionId: qId }),
       });
       if (res.ok) {
@@ -187,21 +189,36 @@ export const ResultPage: React.FC<{ attemptId: string }> = ({ attemptId }) => {
     setRetaking(true);
     try {
       const token = localStorage.getItem('abhi_token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch(`/api/tests/${data.result.testId}/start`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
+        credentials: 'include',
       });
       const json = await res.json();
       if (res.ok && json.attemptId) {
         navigate(`/test/${json.attemptId}`);
       } else {
-        alert(json.error || 'Could not restart test');
-        setRetaking(false);
+        const fallback = (await import('../lib/fallbackData')).startFallbackTestAttempt(data.result.testId);
+        if (fallback.attemptId) {
+          navigate(`/test/${fallback.attemptId}`);
+        } else {
+          alert(json.error || 'Could not restart test');
+          setRetaking(false);
+        }
       }
     } catch (e) {
+      try {
+        const fallback = (await import('../lib/fallbackData')).startFallbackTestAttempt(data.result.testId);
+        if (fallback.attemptId) {
+          navigate(`/test/${fallback.attemptId}`);
+          return;
+        }
+      } catch {}
       alert('Error restarting test');
       setRetaking(false);
     }

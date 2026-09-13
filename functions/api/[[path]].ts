@@ -164,6 +164,65 @@ export async function onRequest(context: any): Promise<Response> {
     return json({ exams: EXAMS });
   }
 
+  // 1e. /api/exams/:id
+  if (pathname.startsWith('/api/exams/')) {
+    const slugOrId = pathname.replace('/api/exams/', '');
+    const exam = EXAMS.find((e) => e.slug === slugOrId || e.id === slugOrId) || EXAMS[0];
+
+    const matchingTests = (dbData.tests || []).filter(
+      (t: any) =>
+        t.examSlug === exam.slug ||
+        t.examId === exam.id ||
+        (t.examName && t.examName.toLowerCase() === exam.name.toLowerCase())
+    );
+
+    const grouped: Record<string, any[]> = {
+      'Full Length': [],
+      'Sectional': [],
+      'Practice': [],
+      'Previous Year': [],
+    };
+
+    matchingTests.forEach((t: any) => {
+      const typeKey = t.testType in grouped ? t.testType : 'Full Length';
+      grouped[typeKey].push({
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        testType: t.testType || 'Full Length',
+        duration: t.duration || 60,
+        totalMarks: t.totalMarks || 100,
+        negativeMarks: t.negativeMarks ?? 0.25,
+        difficulty: t.difficulty || 'Moderate',
+        isPremium: Boolean(t.isPremium),
+        subjectName: t.subjectName || 'Full Syllabus',
+        questionCount: t.questionCount || 20,
+        attemptCount: t.attemptCount || 0,
+      });
+    });
+
+    const subjects = (exam.subjects || []).map((subName: string, idx: number) => ({
+      id: `sub-${idx + 1}`,
+      name: subName,
+      questionCount: 20,
+      topics: ['Concept Drills', 'Previous Year Questions', 'Mock Practice'],
+    }));
+
+    return json({
+      exam: {
+        id: exam.id,
+        name: exam.name,
+        slug: exam.slug,
+        category: exam.category,
+        difficulty: exam.difficulty,
+        description: exam.description,
+        questionCount: exam.questionCount || 20,
+        subjects,
+        testsGrouped: grouped,
+      },
+    });
+  }
+
   // 2. /api/tests
   if (pathname === '/api/tests') {
     let list = [...(dbData.tests || [])];

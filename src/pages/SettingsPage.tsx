@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { navigate } = useRouter();
 
@@ -42,8 +42,21 @@ export const SettingsPage: React.FC = () => {
   // Clear drafts feedback
   const [draftsCleared, setDraftsCleared] = useState(false);
 
+  React.useEffect(() => {
+    if (!loading && !user) {
+      navigate('/login?redirect=/settings');
+    }
+  }, [user, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-20 text-center text-sm text-[var(--ink)] opacity-60">
+        Loading settings...
+      </div>
+    );
+  }
+
   if (!user) {
-    navigate('/login?redirect=/settings');
     return null;
   }
 
@@ -81,15 +94,23 @@ export const SettingsPage: React.FC = () => {
       return;
     }
 
+    if (user?.isGuest) {
+      setPasswordStatus({ type: 'error', message: 'Guest mode active — password modification not available.' });
+      return;
+    }
+
     setUpdatingPassword(true);
     try {
       const token = localStorage.getItem('abhi_token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch('/api/auth/change-password', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
+        credentials: 'include',
         body: JSON.stringify({ currentPassword, newPassword }),
       });
 

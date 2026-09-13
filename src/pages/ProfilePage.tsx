@@ -5,7 +5,7 @@ import { User, KeyRound, Shield, LogOut, CheckCircle2, AlertCircle } from 'lucid
 
 export const ProfilePage: React.FC = () => {
   const { navigate } = useRouter();
-  const { user, logout, updateProfileName } = useAuth();
+  const { user, loading, logout, updateProfileName } = useAuth();
 
   const [name, setName] = useState(user?.name || '');
   const [updatingName, setUpdatingName] = useState(false);
@@ -18,10 +18,24 @@ export const ProfilePage: React.FC = () => {
   const [passwordMsg, setPasswordMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   React.useEffect(() => {
-    if (!user) {
+    if (user?.name) {
+      setName(user.name);
+    }
+  }, [user]);
+
+  React.useEffect(() => {
+    if (!loading && !user) {
       navigate('/login?redirect=/profile');
     }
-  }, [user, navigate]);
+  }, [user, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-20 text-center text-sm text-[var(--ink)] opacity-60">
+        Loading profile...
+      </div>
+    );
+  }
 
   if (!user) {
     return null;
@@ -45,6 +59,11 @@ export const ProfilePage: React.FC = () => {
     e.preventDefault();
     setPasswordMsg(null);
 
+    if (user.isGuest) {
+      setPasswordMsg({ type: 'error', text: 'Guest mode active — password modification not available.' });
+      return;
+    }
+
     if (newPassword.length < 6) {
       setPasswordMsg({ type: 'error', text: 'New password must be at least 6 characters long.' });
       return;
@@ -58,12 +77,15 @@ export const ProfilePage: React.FC = () => {
     setUpdatingPassword(true);
     try {
       const token = localStorage.getItem('abhi_token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch('/api/auth/password', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
+        credentials: 'include',
         body: JSON.stringify({ currentPassword, newPassword }),
       });
 

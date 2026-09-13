@@ -18,6 +18,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 import { GeminiChatbot } from '../components/GeminiChatbot';
 import { QuestionReportModal } from '../components/QuestionReportModal';
 
@@ -47,6 +48,7 @@ interface WrongQuestion {
 
 export const WrongQuestionsPage: React.FC = () => {
   const { navigate } = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [questions, setQuestions] = useState<WrongQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,16 +70,21 @@ export const WrongQuestionsPage: React.FC = () => {
   const [reportingQuestion, setReportingQuestion] = useState<WrongQuestion | null>(null);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      navigate('/login?redirect=/wrong-questions');
+      return;
+    }
+
     async function fetchMistakes() {
       try {
         const token = localStorage.getItem('abhi_token');
-        if (!token) {
-          navigate('/login?redirect=/wrong-questions');
-          return;
-        }
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
 
         const res = await apiFetch('/api/analytics/wrong-questions', {
-          headers: { Authorization: `Bearer ${token}` },
+          headers,
+          credentials: 'include',
         });
 
         if (!res.ok) {
@@ -95,7 +102,7 @@ export const WrongQuestionsPage: React.FC = () => {
     }
 
     fetchMistakes();
-  }, [navigate]);
+  }, [user, authLoading, navigate]);
 
   // Unique subjects
   const subjects = useMemo(() => {

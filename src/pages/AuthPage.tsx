@@ -6,8 +6,9 @@ import { Lock, Mail, User, ShieldCheck, UserCheck, Sparkles, LogIn } from 'lucid
 
 export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => {
   const { navigate, queryParams } = useRouter();
-  const { login, register, guestLogin, signInWithGoogle } = useAuth();
-  const redirectTarget = queryParams.get('redirect') || '/dashboard';
+  const { user, loading, login, register, guestLogin, signInWithGoogle } = useAuth();
+  const explicitRedirect = queryParams.get('redirect');
+  const redirectTarget = explicitRedirect && explicitRedirect !== '/login' ? explicitRedirect : '/dashboard';
 
   const [isLogin, setIsLogin] = useState<boolean>(mode === 'login');
   const [name, setName] = useState('');
@@ -18,6 +19,17 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [guestSubmitting, setGuestSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // If already authenticated or after session sync, redirect away from /login
+  React.useEffect(() => {
+    if (!loading && user) {
+      if (user.isGuest) {
+        navigate(explicitRedirect && explicitRedirect !== '/login' ? explicitRedirect : '/');
+      } else {
+        navigate(redirectTarget);
+      }
+    }
+  }, [user, loading, explicitRedirect, redirectTarget, navigate]);
 
   const handleGoogleSignIn = async () => {
     setError(null);
@@ -37,7 +49,7 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
     const res = await guestLogin();
     setGuestSubmitting(false);
     if (res.success) {
-      navigate(redirectTarget);
+      navigate(explicitRedirect && explicitRedirect !== '/login' ? explicitRedirect : '/');
     } else {
       setError(res.error || 'Failed to initialize guest session.');
     }

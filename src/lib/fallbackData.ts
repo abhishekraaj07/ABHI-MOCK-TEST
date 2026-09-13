@@ -1,4 +1,4 @@
-import { Exam } from '../types';
+import { Exam, ExamDetail, SubjectDetail, TestSummary } from '../types';
 import dbDataRaw from './dbData.json';
 
 const dbData = dbDataRaw as {
@@ -88,6 +88,75 @@ export const FALLBACK_STATS = {
   totalQuestions: FALLBACK_QUESTIONS.length || 120,
   availabilityRate: '99.98%',
 };
+
+// ==========================================
+// EXAM DETAIL BUILDER (testsGrouped contract)
+// ==========================================
+export function getFallbackExamDetail(slugOrId: string): ExamDetail {
+  const baseExam =
+    FALLBACK_EXAMS.find((e) => e.slug === slugOrId || e.id === slugOrId) ||
+    FALLBACK_EXAMS[0];
+
+  const matchingTests = FALLBACK_TESTS.filter(
+    (t: any) =>
+      t.examSlug === baseExam.slug ||
+      t.examId === baseExam.id ||
+      (t.examName && t.examName.toLowerCase() === baseExam.name.toLowerCase())
+  );
+
+  const testsGrouped: {
+    'Full Length': TestSummary[];
+    'Sectional': TestSummary[];
+    'Practice': TestSummary[];
+    'Previous Year': TestSummary[];
+  } = {
+    'Full Length': [],
+    'Sectional': [],
+    'Practice': [],
+    'Previous Year': [],
+  };
+
+  matchingTests.forEach((t: any) => {
+    const typeKey = (t.testType in testsGrouped ? t.testType : 'Full Length') as keyof typeof testsGrouped;
+    testsGrouped[typeKey].push({
+      id: t.id,
+      title: t.title,
+      description: t.description,
+      examId: t.examId || baseExam.id,
+      examName: t.examName || baseExam.name,
+      examSlug: t.examSlug || baseExam.slug,
+      subjectId: t.subjectId || null,
+      subjectName: t.subjectName || 'Full Syllabus',
+      testType: t.testType || 'Full Length',
+      duration: t.duration || 60,
+      totalMarks: t.totalMarks || 100,
+      negativeMarks: t.negativeMarks ?? 0.25,
+      difficulty: t.difficulty || 'Moderate',
+      isPremium: Boolean(t.isPremium),
+      questionCount: t.questionCount || 20,
+      attemptCount: t.attemptCount || 0,
+    });
+  });
+
+  const subjects: SubjectDetail[] = (baseExam.subjects || []).map((subName: string, idx: number) => ({
+    id: `sub-${idx + 1}`,
+    name: subName,
+    questionCount: 20,
+    topics: ['Concept Drills', 'Previous Year Questions', 'Mock Practice'],
+  }));
+
+  return {
+    id: baseExam.id,
+    name: baseExam.name,
+    slug: baseExam.slug,
+    category: baseExam.category,
+    difficulty: baseExam.difficulty,
+    description: baseExam.description,
+    questionCount: baseExam.questionCount || 20,
+    subjects,
+    testsGrouped,
+  };
+}
 
 // ==========================================
 // TEST FILTERING HELPER

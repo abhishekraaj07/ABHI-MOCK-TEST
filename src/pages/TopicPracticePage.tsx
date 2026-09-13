@@ -18,8 +18,12 @@ export const TopicPracticePage: React.FC<{ topicId: string }> = ({ topicId }) =>
     async function loadTopic() {
       try {
         const token = localStorage.getItem('abhi_token');
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
         const res = await fetch(`/api/practice/topics/${topicId}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          headers,
+          credentials: 'include',
         });
 
         if (res.ok) {
@@ -48,13 +52,15 @@ export const TopicPracticePage: React.FC<{ topicId: string }> = ({ topicId }) =>
   const handleToggleBookmark = async (qId: string) => {
     try {
       const token = localStorage.getItem('abhi_token');
-      if (!token) return;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch('/api/bookmarks', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
+        credentials: 'include',
         body: JSON.stringify({ questionId: qId }),
       });
       if (res.ok) {

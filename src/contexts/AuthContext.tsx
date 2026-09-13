@@ -27,8 +27,26 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const stored = localStorage.getItem('abhi_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
   const [loading, setLoading] = useState<boolean>(true);
+
+  const syncUserState = (u: User | null) => {
+    setUser(u);
+    try {
+      if (u) {
+        localStorage.setItem('abhi_user', JSON.stringify(u));
+      } else {
+        localStorage.removeItem('abhi_user');
+      }
+    } catch {}
+  };
 
   // Sync session on mount via secure HTTP-only cookie
   useEffect(() => {
@@ -41,18 +59,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (res.ok) {
           const data = await res.json();
           if (data.user) {
-            setUser(data.user);
+            syncUserState(data.user);
             // Keep Firestore user doc up to date
             syncUserToFirestore(data.user);
           } else {
-            setUser(null);
+            syncUserState(null);
           }
-        } else {
-          setUser(null);
         }
       } catch (err) {
         console.warn('Session check notice:', err);
-        setUser(null);
       } finally {
         // Clean up any legacy localStorage tokens for security (§Phase 2 & 22)
         try {
@@ -81,7 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: errMsg };
       }
 
-      setUser(data.user);
+      syncUserState(data.user);
 
       // Background persist to Firestore
       if (data.user) {
@@ -110,7 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: errMsg };
       }
 
-      setUser(data.user);
+      syncUserState(data.user);
 
       // Persist to Firestore
       if (data.user) {
@@ -135,7 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (res.ok) {
         const data = await res.json();
         if (data.user) {
-          setUser(data.user);
+          syncUserState(data.user);
           return { success: true };
         }
       }
@@ -148,7 +163,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: 'USER',
         isGuest: true,
       };
-      setUser(fallbackGuest);
+      syncUserState(fallbackGuest);
       return { success: true };
     } catch (err: any) {
       const fallbackGuest: User = {
@@ -158,7 +173,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: 'USER',
         isGuest: true,
       };
-      setUser(fallbackGuest);
+      syncUserState(fallbackGuest);
       return { success: true };
     }
   };
@@ -191,7 +206,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: errMsg };
       }
 
-      setUser(data.user);
+      syncUserState(data.user);
 
       // Persist to Firestore database
       if (data.user) {
@@ -231,7 +246,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       localStorage.removeItem('abhi_token');
     } catch {}
-    setUser(null);
+    syncUserState(null);
   };
 
   const updateProfileName = async (name: string) => {
@@ -246,7 +261,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       if (res.ok) {
         const data = await res.json();
-        setUser(data.user);
+        syncUserState(data.user);
         syncUserToFirestore(data.user);
         return true;
       }

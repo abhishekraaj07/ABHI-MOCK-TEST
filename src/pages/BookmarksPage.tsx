@@ -12,9 +12,12 @@ import {
 } from 'lucide-react';
 import { GeminiChatbot } from '../components/GeminiChatbot';
 import { QuestionReportModal } from '../components/QuestionReportModal';
+import { useAuth } from '../contexts/AuthContext';
+import { apiFetch } from '../lib/api';
 
 export const BookmarksPage: React.FC = () => {
   const { navigate } = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [bookmarks, setBookmarks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [aiTutorQuestion, setAiTutorQuestion] = useState<any | null>(null);
@@ -26,16 +29,21 @@ export const BookmarksPage: React.FC = () => {
   const [selectedExam, setSelectedExam] = useState<string>('ALL');
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      navigate('/login?redirect=/bookmarks');
+      return;
+    }
+
     async function loadBookmarks() {
       try {
         const token = localStorage.getItem('abhi_token');
-        if (!token) {
-          navigate('/login?redirect=/bookmarks');
-          return;
-        }
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        const res = await fetch('/api/bookmarks', {
-          headers: { Authorization: `Bearer ${token}` },
+        const res = await apiFetch('/api/bookmarks', {
+          headers,
+          credentials: 'include',
         });
 
         if (res.ok) {
@@ -49,14 +57,18 @@ export const BookmarksPage: React.FC = () => {
       }
     }
     loadBookmarks();
-  }, [navigate]);
+  }, [user, authLoading, navigate]);
 
   const handleRemove = async (id: string) => {
     try {
       const token = localStorage.getItem('abhi_token');
-      const res = await fetch(`/api/bookmarks/${id}`, {
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await apiFetch(`/api/bookmarks/${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        headers,
+        credentials: 'include',
       });
       if (res.ok) {
         setBookmarks((prev) => prev.filter((b) => b.id !== id && b.questionId !== id));

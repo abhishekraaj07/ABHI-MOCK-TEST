@@ -24,26 +24,32 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from 'recharts';
+import { apiFetch } from '../lib/api';
 
 export const DashboardPage: React.FC = () => {
   const { navigate } = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      navigate('/login?redirect=/dashboard');
+      return;
+    }
+
     async function loadDashboard() {
       try {
         const token = localStorage.getItem('abhi_token');
-        if (!token) {
-          navigate('/login?redirect=/dashboard');
-          return;
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
         }
 
-        const res = await fetch('/api/dashboard', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+        const res = await apiFetch('/api/dashboard', {
+          headers,
+          credentials: 'include',
         });
 
         if (res.ok) {
@@ -58,7 +64,7 @@ export const DashboardPage: React.FC = () => {
     }
 
     loadDashboard();
-  }, [navigate]);
+  }, [user, authLoading, navigate]);
 
   if (loading) {
     return (

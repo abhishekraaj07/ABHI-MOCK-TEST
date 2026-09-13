@@ -1,10 +1,61 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, Link } from '../contexts/RouterContext';
 import { ExamDetail, TestSummary } from '../types';
-import { Clock, HelpCircle, Award, ChevronRight, Lock, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { HelpCircle, ChevronRight, Lock, ArrowLeft } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 
-export const ExamDetailPage: React.FC<{ examSlugOrId?: string; slug?: string }> = ({ examSlugOrId, slug }) => {
+class ExamDetailErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('ExamDetail boundary caught error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="mx-auto max-w-2xl px-4 py-20 text-center space-y-4">
+          <div className="mx-auto w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-600">
+            <HelpCircle size={24} />
+          </div>
+          <h2 className="font-serif text-2xl font-bold text-[var(--ink)]">
+            Examination Portal Notice
+          </h2>
+          <p className="text-sm text-[var(--ink)] opacity-75 max-w-md mx-auto">
+            Unable to load examination details at this moment. You can view all available exams or retry.
+          </p>
+          <div className="flex justify-center gap-3 pt-2">
+            <button
+              onClick={() => this.setState({ hasError: false })}
+              className="rounded bg-[var(--surface)] border border-[var(--line)] px-4 py-2 text-xs font-bold text-[var(--ink)] hover:border-[var(--accent)]"
+            >
+              Retry
+            </button>
+            <Link
+              href="/exams"
+              className="rounded bg-[var(--accent)] px-4 py-2 text-xs font-bold text-white hover:bg-[var(--accent-hover)]"
+            >
+              Back to all exams
+            </Link>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const ExamDetailInner: React.FC<{ examSlugOrId?: string; slug?: string }> = ({ examSlugOrId, slug }) => {
   const effectiveIdOrSlug = slug || examSlugOrId || '';
   const { navigate } = useRouter();
   const [data, setData] = useState<ExamDetail | null>(null);
@@ -55,7 +106,34 @@ export const ExamDetailPage: React.FC<{ examSlugOrId?: string; slug?: string }> 
     );
   }
 
-  const currentTests: TestSummary[] = data.testsGrouped[activeTab] || [];
+  // Defensively ensure testsGrouped structure is never undefined
+  const testsGrouped: Record<string, TestSummary[]> = {
+    'Full Length': [],
+    'Sectional': [],
+    'Practice': [],
+    'Previous Year': [],
+    ...(data?.testsGrouped || {}),
+  };
+
+  // Safely normalize subjects whether they are strings or detailed objects
+  const normalizedSubjects = (data.subjects || []).map((sub: any, idx: number) => {
+    if (typeof sub === 'string') {
+      return {
+        id: `sub-${idx + 1}`,
+        name: sub,
+        questionCount: 20,
+        topics: ['Concept Drills', 'Previous Year Questions', 'Mock Practice'],
+      };
+    }
+    return {
+      id: sub.id || `sub-${idx + 1}`,
+      name: sub.name || 'Subject Module',
+      questionCount: sub.questionCount ?? 20,
+      topics: Array.isArray(sub.topics) ? sub.topics : ['Concept Drills', 'Previous Year Questions', 'Mock Practice'],
+    };
+  });
+
+  const currentTests: TestSummary[] = testsGrouped[activeTab] || [];
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -92,31 +170,33 @@ export const ExamDetailPage: React.FC<{ examSlugOrId?: string; slug?: string }> 
         </p>
 
         {/* Subjects & Topics Breakdown Accordion/Grid */}
-        <div className="border-t border-[var(--line)] pt-6 mt-6">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)] mb-3">
-            Examination Syllabus & Subject Modules
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {data.subjects.map((sub) => (
-              <div key={sub.id} className="rounded border border-[var(--line)] bg-[var(--paper)] p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold text-[var(--ink)]">{sub.name}</h3>
-                  <span className="text-[10px] font-mono opacity-60">{sub.questionCount} Qs</span>
+        {normalizedSubjects.length > 0 && (
+          <div className="border-t border-[var(--line)] pt-6 mt-6">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)] mb-3">
+              Examination Syllabus & Subject Modules
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {normalizedSubjects.map((sub) => (
+                <div key={sub.id} className="rounded border border-[var(--line)] bg-[var(--paper)] p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold text-[var(--ink)]">{sub.name}</h3>
+                    <span className="text-[10px] font-mono opacity-60">{sub.questionCount} Qs</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {sub.topics.map((tp) => (
+                      <span
+                        key={tp}
+                        className="rounded bg-[var(--surface)] border border-[var(--line)] px-1.5 py-0.5 text-[10px] opacity-80"
+                      >
+                        {tp}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-1">
-                  {sub.topics.map((tp) => (
-                    <span
-                      key={tp}
-                      className="rounded bg-[var(--surface)] border border-[var(--line)] px-1.5 py-0.5 text-[10px] opacity-80"
-                    >
-                      {tp}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Test Categories Tabs */}
@@ -124,7 +204,7 @@ export const ExamDetailPage: React.FC<{ examSlugOrId?: string; slug?: string }> 
         <div className="flex items-center justify-between border-b border-[var(--line)] pb-3">
           <div className="flex gap-2 sm:gap-4 overflow-x-auto">
             {(['Full Length', 'Sectional', 'Practice', 'Previous Year'] as const).map((tab) => {
-              const count = data.testsGrouped[tab]?.length || 0;
+              const count = testsGrouped[tab]?.length || 0;
               return (
                 <button
                   key={tab}
@@ -216,6 +296,14 @@ export const ExamDetailPage: React.FC<{ examSlugOrId?: string; slug?: string }> 
         )}
       </div>
     </div>
+  );
+};
+
+export const ExamDetailPage: React.FC<{ examSlugOrId?: string; slug?: string }> = (props) => {
+  return (
+    <ExamDetailErrorBoundary>
+      <ExamDetailInner {...props} />
+    </ExamDetailErrorBoundary>
   );
 };
 

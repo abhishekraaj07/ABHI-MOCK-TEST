@@ -85,13 +85,16 @@ interface AnalyticsData {
   insights: string[];
 }
 
+import { apiFetch } from '../lib/api';
+
 export const AnalyticsPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { navigate } = useRouter();
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) {
       navigate('/login?redirect=/analytics');
       return;
@@ -100,10 +103,12 @@ export const AnalyticsPage: React.FC = () => {
     async function loadAnalytics() {
       try {
         const token = localStorage.getItem('abhi_token');
-        const res = await fetch('/api/analytics', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await apiFetch('/api/analytics', {
+          headers,
+          credentials: 'include',
         });
 
         if (res.ok) {
@@ -118,7 +123,7 @@ export const AnalyticsPage: React.FC = () => {
     }
 
     loadAnalytics();
-  }, [user, navigate]);
+  }, [user, authLoading, navigate]);
 
   if (loading) {
     return (

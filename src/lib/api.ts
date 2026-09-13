@@ -17,6 +17,7 @@ import {
   submitFallbackTestAttempt,
   getFallbackTestResult,
   FALLBACK_TESTS,
+  getFallbackExamDetail,
 } from './fallbackData';
 
 /**
@@ -49,9 +50,7 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
     }
     if (pathname.startsWith('/api/exams/')) {
       const slugOrId = pathname.replace('/api/exams/', '');
-      const exam =
-        FALLBACK_EXAMS.find((e) => e.slug === slugOrId || e.id === slugOrId) ||
-        FALLBACK_EXAMS[0];
+      const exam = getFallbackExamDetail(slugOrId);
       return jsonResponse({ exam });
     }
 
@@ -212,7 +211,18 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
       return jsonResponse({ success: true, message: 'Report submitted successfully.' });
     }
 
-    // 12. /api/auth/me
+    // 12. /api/auth/guest-session & /api/auth/me
+    if (pathname === '/api/auth/guest-session' && method === 'POST') {
+      const guestUser = {
+        id: `guest_${Date.now()}`,
+        name: 'Guest Aspirant',
+        email: `guest_${Date.now()}@guest.abhimocktest.com`,
+        role: 'USER',
+        isGuest: true,
+      };
+      localStorage.setItem('abhi_user', JSON.stringify(guestUser));
+      return jsonResponse({ success: true, user: guestUser });
+    }
     if (pathname === '/api/auth/me') {
       const storedUser = localStorage.getItem('abhi_user');
       if (storedUser) {

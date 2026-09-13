@@ -3,26 +3,35 @@ import { useRouter, Link } from '../contexts/RouterContext';
 import { AttemptHistoryItem } from '../types';
 import { Clock, CheckCircle2, RotateCcw, ArrowRight } from 'lucide-react';
 
+import { useAuth } from '../contexts/AuthContext';
+import { apiFetch } from '../lib/api';
+
 export const MyTestsPage: React.FC = () => {
   const { navigate } = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [attempts, setAttempts] = useState<AttemptHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'All' | 'Completed' | 'In Progress'>('All');
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      navigate('/login?redirect=/my-tests');
+      return;
+    }
+
     async function loadAttempts() {
       try {
         const token = localStorage.getItem('abhi_token');
-        if (!token) {
-          navigate('/login?redirect=/my-tests');
-          return;
-        }
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
 
         const params = new URLSearchParams();
         if (activeTab !== 'All') params.set('status', activeTab);
 
-        const res = await fetch(`/api/attempts?${params.toString()}`, {
-          headers: { Authorization: `Bearer ${token}` },
+        const res = await apiFetch(`/api/attempts?${params.toString()}`, {
+          headers,
+          credentials: 'include',
         });
 
         if (res.ok) {
@@ -37,7 +46,7 @@ export const MyTestsPage: React.FC = () => {
     }
 
     loadAttempts();
-  }, [activeTab, navigate]);
+  }, [user, authLoading, activeTab, navigate]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">

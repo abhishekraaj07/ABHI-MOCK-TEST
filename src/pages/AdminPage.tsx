@@ -23,7 +23,7 @@ import {
 
 export const AdminPage: React.FC = () => {
   const { navigate } = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'TESTS' | 'QUESTIONS' | 'USERS' | 'BULK_IMPORT' | 'REPORTS'>('OVERVIEW');
   const [stats, setStats] = useState<any>(null);
@@ -75,6 +75,7 @@ export const AdminPage: React.FC = () => {
   const token = localStorage.getItem('abhi_token');
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) {
       navigate('/login?redirect=/admin');
       return;
@@ -86,15 +87,16 @@ export const AdminPage: React.FC = () => {
 
     async function loadAdminData() {
       try {
-        const headers = { Authorization: `Bearer ${token}` };
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
 
         const [statsRes, testsRes, qRes, usersRes, examsRes, reportsRes] = await Promise.all([
-          fetch('/api/admin/stats', { headers }),
-          fetch('/api/admin/tests', { headers }),
-          fetch('/api/admin/questions', { headers }),
-          fetch('/api/admin/users', { headers }),
-          fetch('/api/exams'),
-          fetch('/api/reports', { headers }),
+          fetch('/api/admin/stats', { headers, credentials: 'include' }),
+          fetch('/api/admin/tests', { headers, credentials: 'include' }),
+          fetch('/api/admin/questions', { headers, credentials: 'include' }),
+          fetch('/api/admin/users', { headers, credentials: 'include' }),
+          fetch('/api/exams', { credentials: 'include' }),
+          fetch('/api/reports', { headers, credentials: 'include' }),
         ]);
 
         if (statsRes.ok) setStats(await statsRes.json());
