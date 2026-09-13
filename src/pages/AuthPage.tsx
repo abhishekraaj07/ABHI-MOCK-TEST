@@ -6,7 +6,7 @@ import { Lock, Mail, User, ShieldCheck, UserCheck, Sparkles, LogIn } from 'lucid
 
 export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => {
   const { navigate, queryParams } = useRouter();
-  const { login, register, signInWithGoogle } = useAuth();
+  const { login, register, guestLogin, signInWithGoogle } = useAuth();
   const redirectTarget = queryParams.get('redirect') || '/dashboard';
 
   const [isLogin, setIsLogin] = useState<boolean>(mode === 'login');
@@ -16,6 +16,7 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
+  const [guestSubmitting, setGuestSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleGoogleSignIn = async () => {
@@ -27,6 +28,18 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
       navigate(redirectTarget);
     } else {
       setError(res.error || 'Google Sign-In failed');
+    }
+  };
+
+  const handleGuestLogin = async () => {
+    setError(null);
+    setGuestSubmitting(true);
+    const res = await guestLogin();
+    setGuestSubmitting(false);
+    if (res.success) {
+      navigate(redirectTarget);
+    } else {
+      setError(res.error || 'Failed to initialize guest session.');
     }
   };
 
@@ -59,19 +72,6 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
     }
   };
 
-  // Quick 1-click Demo Fill (email only — never ship passwords in client bundles)
-  const fillStudent = () => {
-    setIsLogin(true);
-    setEmail('student@abhimocktest.com');
-    setPassword('');
-  };
-
-  const fillAdmin = () => {
-    setIsLogin(true);
-    setEmail('admin@abhimocktest.com');
-    setPassword('');
-  };
-
   return (
     <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-12 bg-[var(--paper)]">
       <div className="w-full max-w-md space-y-6">
@@ -85,43 +85,41 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
           </h1>
           <p className="text-xs text-[var(--ink)] opacity-70">
             {isLogin
-              ? 'Sign in securely with Google or credentials to access your tests and scorecards.'
+              ? 'Sign in securely with Google, credentials, or explore in Guest Mode.'
               : 'Create your account to unlock simulated mocks and diagnostic analytics.'}
           </p>
         </div>
 
-        {/* Quick Demo Logins Box */}
+        {/* Guest Mode Card */}
         <div className="rounded border border-[var(--line)] bg-[var(--surface)] p-4 space-y-2 text-xs">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">
-            Instant Demo Logins
+          <div className="flex items-center justify-between">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)] flex items-center gap-1.5">
+              <Sparkles size={12} /> Instant Access
+            </div>
+            <span className="text-[10px] text-[var(--ink)] opacity-60">No account required</span>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              id="demo-student-btn"
-              onClick={fillStudent}
-              className="rounded border border-[var(--line)] bg-[var(--paper)] p-2 text-left hover:border-[var(--accent)] transition-colors flex items-center gap-2"
-            >
-              <UserCheck size={16} className="text-[var(--accent)] flex-shrink-0" />
-              <div>
-                <div className="font-bold text-[11px] text-[var(--ink)]">Student Login</div>
-                <div className="text-[9px] opacity-60">student@abhimocktest.com</div>
+          <button
+            type="button"
+            id="guest-mode-btn"
+            onClick={handleGuestLogin}
+            disabled={guestSubmitting || submitting || googleSubmitting}
+            className="w-full rounded border border-[var(--line)] bg-[var(--paper)] p-3 text-left hover:border-[var(--accent)] hover:bg-[var(--surface)] transition-all flex items-center justify-between group disabled:opacity-50"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-[var(--surface)] border border-[var(--line)] flex items-center justify-center text-[var(--accent)] group-hover:scale-105 transition-transform">
+                <UserCheck size={16} />
               </div>
-            </button>
-
-            <button
-              type="button"
-              id="demo-admin-btn"
-              onClick={fillAdmin}
-              className="rounded border border-[var(--line)] bg-[var(--paper)] p-2 text-left hover:border-red-500 transition-colors flex items-center gap-2"
-            >
-              <ShieldCheck size={16} className="text-red-600 flex-shrink-0" />
               <div>
-                <div className="font-bold text-[11px] text-[var(--ink)]">Admin Login</div>
-                <div className="text-[9px] opacity-60">admin@abhimocktest.com</div>
+                <div className="font-bold text-xs text-[var(--ink)]">Guest Mode</div>
+                <div className="text-[11px] text-[var(--ink)] opacity-70">
+                  Try ABHI MOCK TEST without creating an account
+                </div>
               </div>
-            </button>
-          </div>
+            </div>
+            <span className="text-xs font-semibold text-[var(--accent)] group-hover:translate-x-0.5 transition-transform">
+              {guestSubmitting ? 'Entering...' : 'Enter →'}
+            </span>
+          </button>
         </div>
 
         {/* Main Auth Form Card */}

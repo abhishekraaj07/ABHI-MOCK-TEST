@@ -85,8 +85,25 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
           } catch {}
         }
 
-        // If backend attempt not found, look up local attempt or fallback
-        if (!json || (!json.attempt && !json.test)) {
+        // If backend attempt not found, or has no questions:
+        if (!json || (!json.attempt && !json.test) || !(json.questions?.length || (json.attempt as any)?.questions?.length)) {
+          // 1. Check if attemptId is actually a testId by attempting to start/resume it
+          try {
+            const startRes = await fetch(`/api/tests/${attemptId}/start`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+            });
+            if (startRes.ok) {
+              const startJson = await startRes.json();
+              if (startJson.attemptId && startJson.attemptId !== attemptId) {
+                navigate(`/test/${startJson.attemptId}`);
+                return;
+              }
+            }
+          } catch {}
+
+          // 2. Look up local attempts draft
           try {
             const localAttempts = JSON.parse(localStorage.getItem('abhi_local_attempts') || '{}');
             if (localAttempts[attemptId]) {
@@ -97,8 +114,9 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
             }
           } catch {}
 
-          if (!json || (!json.attempt && !json.test)) {
-            const fallback = (await import('../lib/fallbackData')).startFallbackTestAttempt('sbi-po-test-1');
+          // 3. Fallback to startFallbackTestAttempt
+          if (!json || (!json.attempt && !json.test) || !(json.questions?.length || (json.attempt as any)?.questions?.length)) {
+            const fallback = (await import('../lib/fallbackData')).startFallbackTestAttempt(attemptId);
             json = {
               attempt: fallback.attempt,
               questions: fallback.questions,
@@ -106,7 +124,11 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
           }
         }
 
-        const rawQuestions = json.questions || (json.attempt as any)?.questions || [];
+        let rawQuestions = json.questions || (json.attempt as any)?.questions || [];
+        if (!rawQuestions || rawQuestions.length === 0) {
+          const fallback = (await import('../lib/fallbackData')).startFallbackTestAttempt('sbi-po-test-1');
+          rawQuestions = fallback.questions || [];
+        }
         const normalizedQuestions: ActiveQuestion[] = rawQuestions.map((q: any, idx: number) => ({
           questionId: q.questionId || q.id || `q-${idx + 1}`,
           order: q.order || idx + 1,
@@ -226,7 +248,12 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
 
         setUserAnswers(answersMap);
         setBookmarkedSet(bSet);
-        setRemainingTime(json.attempt.remainingSeconds);
+        const totalDuration = Number(
+          normalizedAttempt.totalDurationSeconds ??
+          (normalizedAttempt.durationMinutes ? normalizedAttempt.durationMinutes * 60 : 3600)
+        );
+        const remSec = Number(normalizedAttempt.remainingSeconds ?? totalDuration);
+        setRemainingTime(isNaN(remSec) || remSec < 0 ? 3600 : remSec);
         setLoading(false);
       } catch (err: any) {
         setErrorMessage(err.message || 'Error connecting to test server.');
@@ -422,10 +449,17 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
     };
   }, [attemptId]);
 
+  // Safe helper to obtain active question
+  const getCurrentQuestion = (): ActiveQuestion | null => {
+    if (!data || !data.questions || data.questions.length === 0) return null;
+    const safeIdx = Math.max(0, Math.min(currentIndex, data.questions.length - 1));
+    return data.questions[safeIdx] || null;
+  };
+
   // Option select handler with debounced auto-save & crash prevention
   const handleOptionChange = (optionKey: string) => {
-    if (!data) return;
-    const currentQ = data.questions[currentIndex];
+    const currentQ = getCurrentQuestion();
+    if (!currentQ) return;
     const prev = userAnswers.get(currentQ.questionId);
 
     const updated: QuestionAnswerState = {
@@ -447,8 +481,8 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
 
   // Clear response handler
   const handleClearResponse = () => {
-    if (!data) return;
-    const currentQ = data.questions[currentIndex];
+    const currentQ = getCurrentQuestion();
+    if (!currentQ) return;
     const prev = userAnswers.get(currentQ.questionId);
 
     const updated: QuestionAnswerState = {
@@ -467,8 +501,8 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
 
   // Mark for review toggle
   const handleToggleMark = () => {
-    if (!data) return;
-    const currentQ = data.questions[currentIndex];
+    const currentQ = getCurrentQuestion();
+    if (!currentQ) return;
     const prev = userAnswers.get(currentQ.questionId);
     const newMarked = !prev?.isMarked;
 
@@ -514,8 +548,8 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
 
   // Bookmark toggle
   const handleToggleBookmark = async () => {
-    if (!data) return;
-    const currentQ = data.questions[currentIndex];
+    const currentQ = getCurrentQuestion();
+    if (!currentQ) return;
     const token = localStorage.getItem('abhi_token');
 
     try {
@@ -607,22 +641,39 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
     );
   }
 
-  if (errorMessage || !data) {
+  if (errorMessage || !data || !data.questions || data.questions.length === 0) {
     return (
-      <div className="mx-auto max-w-lg px-4 py-20 text-center space-y-4">
-        <h2 className="font-serif text-2xl font-bold text-[var(--ink)]">Examination Session Error</h2>
-        <p className="text-sm text-[var(--signal-wrong)]">{errorMessage}</p>
-        <button
-          onClick={() => navigate('/mock-tests')}
-          className="rounded bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white"
-        >
-          Return to Mock Tests
-        </button>
+      <div className="flex min-h-screen items-center justify-center bg-[var(--paper)] p-4">
+        <div className="mx-auto max-w-md w-full rounded border border-[var(--line)] bg-[var(--surface)] p-6 sm:p-8 text-center space-y-4 shadow-sm">
+          <h2 className="font-serif text-2xl font-bold text-[var(--ink)]">
+            {errorMessage ? 'Examination Session Error' : 'Mock Test Unavailable'}
+          </h2>
+          <p className="text-xs sm:text-sm text-[var(--ink)] opacity-70">
+            {errorMessage || 'No questions could be retrieved for this mock test session. Please retry or return to mock tests.'}
+          </p>
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded border border-[var(--line)] px-4 py-2 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--paper)] transition-colors"
+            >
+              Retry Loading
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/mock-tests')}
+              className="rounded bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white hover:bg-[var(--accent-hover)] transition-colors"
+            >
+              Back to Tests
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
 
-  const currentQ: ActiveQuestion = data.questions[currentIndex];
+  const safeIndex = Math.max(0, Math.min(currentIndex, data.questions.length - 1));
+  const currentQ: ActiveQuestion = data.questions[safeIndex];
   const curAnswer = userAnswers.get(currentQ?.questionId);
 
   // Compute status for question in palette
@@ -861,14 +912,14 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
             <div className="flex items-center justify-between border-b border-[var(--line)] pb-3 text-xs text-[var(--ink)]">
               <div className="flex items-center gap-2">
                 <span className="rounded bg-[var(--surface)] border border-[var(--line)] px-2 py-0.5 font-semibold text-[var(--accent)]">
-                  {currentQ.subjectName}
+                  {currentQ?.subjectName || 'General'}
                 </span>
-                <span className="opacity-75 font-medium">{currentQ.topicName}</span>
+                <span className="opacity-75 font-medium">{currentQ?.topicName || 'General'}</span>
               </div>
 
               <div className="flex items-center gap-4">
                 <span className="font-mono text-xs opacity-75">
-                  +{currentQ.marks.toFixed(2)} / -{currentQ.negativeMarks.toFixed(2)}
+                  +{(currentQ?.marks ?? 1).toFixed(2)} / -{(currentQ?.negativeMarks ?? 0.25).toFixed(2)}
                 </span>
                 <button
                   type="button"
@@ -876,7 +927,7 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
                   title="Bookmark question"
                   className="flex items-center gap-1 opacity-70 hover:opacity-100 text-[var(--accent)]"
                 >
-                  {bookmarkedSet.has(currentQ.questionId) ? (
+                  {bookmarkedSet.has(currentQ?.questionId || '') ? (
                     <BookmarkCheck size={16} className="text-[var(--accent)] fill-current" />
                   ) : (
                     <Bookmark size={16} />
@@ -885,7 +936,7 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
                 </button>
                 <button
                   type="button"
-                  onClick={() => setReportingQuestion(currentQ)}
+                  onClick={() => currentQ && setReportingQuestion(currentQ)}
                   title="Report question error or typo"
                   className="flex items-center gap-1 opacity-70 hover:opacity-100 text-amber-600 dark:text-amber-400"
                 >
@@ -898,17 +949,17 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
             {/* Question Text */}
             <div className="space-y-3">
               <div className="font-mono text-xs font-bold text-[var(--accent)]">
-                QUESTION {currentIndex + 1}
+                QUESTION {safeIndex + 1}
               </div>
               <p className="text-base sm:text-lg font-medium text-[var(--ink)] leading-relaxed font-sans">
-                {currentQ.questionText}
+                {currentQ?.questionText || 'Question text unavailable.'}
               </p>
             </div>
 
             {/* Options Radio Group (§8 - Standard Fieldset) */}
             <fieldset className="space-y-3 pt-2">
-              <legend className="sr-only">Answer options for Question {currentIndex + 1}</legend>
-              {currentQ.options.map((opt) => {
+              <legend className="sr-only">Answer options for Question {safeIndex + 1}</legend>
+              {(currentQ?.options || []).map((opt) => {
                 const isChecked = curAnswer?.selectedOption === opt.optionKey;
                 return (
                   <label
@@ -922,7 +973,7 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
                   >
                     <input
                       type="radio"
-                      name={`question-${currentQ.questionId}`}
+                      name={`question-${currentQ?.questionId || safeIndex}`}
                       value={opt.optionKey}
                       checked={isChecked}
                       onChange={() => handleOptionChange(opt.optionKey)}
@@ -1203,4 +1254,63 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
   );
 };
 
-export default LiveTestEnginePage;
+// Resilient Crash Boundary preventing white-screen failures
+class LiveTestErrorBoundary extends React.Component<
+  { children: React.ReactNode; onRetry?: () => void; onBack?: () => void },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error('Test Engine Boundary caught an unhandled error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-[var(--paper)] p-4">
+          <div className="mx-auto max-w-md w-full rounded border border-[var(--line)] bg-[var(--surface)] p-6 sm:p-8 text-center space-y-4 shadow-sm">
+            <h2 className="font-serif text-2xl font-bold text-[var(--ink)]">Mock Test Notice</h2>
+            <p className="text-xs sm:text-sm text-[var(--ink)] opacity-70">
+              The examination interface encountered an unexpected rendering condition. Your responses and session state remain safely preserved.
+            </p>
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  this.setState({ hasError: false, error: null });
+                  window.location.reload();
+                }}
+                className="rounded border border-[var(--line)] px-4 py-2 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--paper)] transition-colors"
+              >
+                Reload Test
+              </button>
+              <a
+                href="/mock-tests"
+                className="rounded bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white hover:bg-[var(--accent-hover)] transition-colors inline-block"
+              >
+                Back to Tests
+              </a>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export const LiveTestEnginePageWrapped: React.FC<{ attemptId: string }> = (props) => (
+  <LiveTestErrorBoundary>
+    <LiveTestEnginePage {...props} />
+  </LiveTestErrorBoundary>
+);
+
+export default LiveTestEnginePageWrapped;

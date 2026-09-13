@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { prisma } from '../db';
 import {
   AuthRequest,
@@ -16,6 +17,48 @@ import {
 } from '../validators/schemas';
 
 const router = Router();
+
+// POST /api/auth/guest-session - Genuine server-authenticated guest session
+router.post('/guest-session', async (req: AuthRequest, res: Response) => {
+  try {
+    const guestId = crypto.randomUUID();
+    const guestEmail = `guest_${guestId.slice(0, 8)}@guest.abhimocktest.com`;
+    const randomSecret = crypto.randomBytes(32).toString('hex');
+    const passwordHash = await bcrypt.hash(randomSecret, 10);
+
+    const guestUser = await prisma.user.create({
+      data: {
+        name: 'Guest Aspirant',
+        email: guestEmail,
+        passwordHash,
+        role: 'USER',
+        isGuest: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isGuest: true,
+        createdAt: true,
+      },
+    });
+
+    const token = signToken(guestUser);
+    res.cookie(AUTH_COOKIE_NAME, token, AUTH_COOKIE_OPTIONS);
+
+    return res.status(201).json({
+      success: true,
+      user: guestUser,
+    });
+  } catch (error) {
+    console.error('Guest session creation error:', error);
+    return res.status(500).json({
+      success: false,
+      error: { code: 'GUEST_SESSION_FAILED', message: 'Failed to create guest session.' },
+    });
+  }
+});
 
 // POST /api/auth/register
 router.post('/register', async (req: AuthRequest, res: Response) => {
@@ -64,6 +107,7 @@ router.post('/register', async (req: AuthRequest, res: Response) => {
         name: true,
         email: true,
         role: true,
+        isGuest: true,
         createdAt: true,
       },
     });
@@ -123,6 +167,7 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      isGuest: user.isGuest,
     };
 
     const token = signToken(safeUser);
@@ -156,24 +201,23 @@ router.post('/logout', (_req: AuthRequest, res: Response) => {
 /**
  * Verify Google/Firebase ID token server-side via Google's OAuth2 tokeninfo endpoint
  */
-async function verifyGoogleIdToken(idToken: string): Promise<{
-  email: string;
-  name: string;
-  sub: string;
-  picture?: string;
-} | null> {
+async function verifyFirebaseIdToken(idToken: string): Promise<{ email: string; name?: string; sub: string } | null> {
   try {
     const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data.email || !data.sub) return null;
+    if (!res.ok) {
+      return null;
+    }
+    const data: any = await res.json();
+    if (!data.email) {
+      return null;
+    }
     return {
       email: data.email,
-      name: data.name || data.email.split('@')[0],
+      name: data.name,
       sub: data.sub,
-      picture: data.picture,
     };
-  } catch {
+  } catch (err) {
+    console.warn('Firebase tokeninfo verification failed:', err);
     return null;
   }
 }
@@ -187,17 +231,16 @@ router.post('/firebase-sync', async (req: AuthRequest, res: Response) => {
     let verifiedName: string;
     let verifiedSub: string;
 
-    // Verify token if provided
-    if (idToken && typeof idToken === 'string') {
-      const verified = await verifyGoogleIdToken(idToken);
+    if (idToken) {
+      const verified = await verifyFirebaseIdToken(idToken);
       if (!verified) {
         return res.status(401).json({
           success: false,
-          error: { code: 'INVALID_FIREBASE_TOKEN', message: 'Invalid or expired Firebase authentication token.' },
+          error: { code: 'INVALID_ID_TOKEN', message: 'Failed to verify Firebase authentication credentials.' },
         });
       }
-      verifiedEmail = verified.email.trim().toLowerCase();
-      verifiedName = verified.name;
+      verifiedEmail = verified.email.toLowerCase();
+      verifiedName = verified.name || verifiedEmail.split('@')[0];
       verifiedSub = verified.sub;
     } else {
       // In development, if no Google credentials configured, require email
@@ -231,6 +274,7 @@ router.post('/firebase-sync', async (req: AuthRequest, res: Response) => {
           email: verifiedEmail,
           passwordHash: dummyPassword,
           role: 'USER', // Admin role must ONLY be configured via database
+          isGuest: false,
         },
       });
     }
@@ -240,6 +284,7 @@ router.post('/firebase-sync', async (req: AuthRequest, res: Response) => {
       name: user.name,
       email: user.email,
       role: user.role, // Preserves database role
+      isGuest: false,
     };
 
     const token = signToken(safeUser);
@@ -269,6 +314,7 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
         name: true,
         email: true,
         role: true,
+        isGuest: true,
         createdAt: true,
       },
     });
@@ -342,6 +388,13 @@ const handleChangePassword = async (req: AuthRequest, res: Response) => {
     }
 
     const { currentPassword, newPassword } = parseResult.data;
+
+    if (req.user?.isGuest) {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'GUEST_RESTRICTION', message: 'Guest accounts cannot change passwords. Please register a full account.' },
+      });
+    }
 
     const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
     if (!user) {

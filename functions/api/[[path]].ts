@@ -105,7 +105,61 @@ export async function onRequest(context: any): Promise<Response> {
     });
   }
 
-  // 1. /api/exams
+  // 1a. /api/auth/guest-session
+  if (pathname === '/api/auth/guest-session' && method === 'POST') {
+    const guestId = `guest_edge_${Date.now()}`;
+    const guestUser = {
+      id: guestId,
+      name: 'Guest Aspirant',
+      email: `guest_${Date.now()}@guest.abhimocktest.com`,
+      role: 'USER',
+      isGuest: true,
+      createdAt: new Date().toISOString(),
+    };
+    return new Response(JSON.stringify({ success: true, user: guestUser }), {
+      status: 201,
+      headers: {
+        'Content-Type': 'application/json',
+        'Set-Cookie': `token=edge_guest_${Date.now()}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`,
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      },
+    });
+  }
+
+  // 1b. /api/auth/me
+  if (pathname === '/api/auth/me' && method === 'GET') {
+    const cookie = request.headers.get('Cookie') || '';
+    if (cookie.includes('token=')) {
+      return json({
+        success: true,
+        user: {
+          id: 'guest_aspirant',
+          name: 'Guest Aspirant',
+          email: 'guest@abhimocktest.com',
+          role: 'USER',
+          isGuest: true,
+        },
+        stats: { completedTests: 0, bookmarkedQuestions: 0 },
+      });
+    }
+    return json({ success: false, error: 'Unauthorized' }, 401);
+  }
+
+  // 1c. /api/auth/logout
+  if (pathname === '/api/auth/logout' && method === 'POST') {
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Set-Cookie': 'token=; Path=/; HttpOnly; Max-Age=0',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  }
+
+  // 1d. /api/exams
   if (pathname === '/api/exams') {
     return json({ exams: EXAMS });
   }

@@ -7,7 +7,7 @@ import { Clock, HelpCircle, Award, AlertCircle, ArrowLeft, CheckSquare, Square }
 
 export const TestInstructionsPage: React.FC<{ testId: string }> = ({ testId }) => {
   const { navigate } = useRouter();
-  const { user } = useAuth();
+  const { user, guestLogin } = useAuth();
   const [data, setData] = useState<TestInstruction | null>(null);
   const [loading, setLoading] = useState(true);
   const [agreed, setAgreed] = useState(false);
@@ -17,12 +17,44 @@ export const TestInstructionsPage: React.FC<{ testId: string }> = ({ testId }) =
   useEffect(() => {
     async function loadInstructions() {
       try {
-        const res = await fetch(`/api/tests/${testId}`);
+        const res = await fetch(`/api/tests/${testId}`, { credentials: 'include' });
         if (res.ok) {
           const json = await res.json();
           setData(json.test);
         } else {
-          setErrorMessage('Test not found or unavailable.');
+          // If not found in DB, try fallback data
+          const fallbackData = await import('../lib/fallbackData');
+          const fallbackTest = fallbackData.FALLBACK_TESTS_WITH_QUESTIONS.find((t) => t.id === testId) ||
+            fallbackData.FALLBACK_TESTS_WITH_QUESTIONS[0];
+          if (fallbackTest) {
+            setData({
+              id: fallbackTest.id,
+              title: fallbackTest.title,
+              description: fallbackTest.description,
+              examId: fallbackTest.examId,
+              examName: fallbackTest.examName || 'Competitive Exam',
+              subjectId: fallbackTest.subjectId,
+              subjectName: fallbackTest.subjectName || 'Full Syllabus',
+              testType: fallbackTest.testType,
+              duration: fallbackTest.duration,
+              totalMarks: fallbackTest.totalMarks,
+              negativeMarks: fallbackTest.negativeMarks,
+              difficulty: fallbackTest.difficulty,
+              isPremium: false,
+              questionCount: fallbackTest.questionCount || 20,
+              language: 'English',
+              activeAttemptId: null,
+              instructions: [
+                `The examination comprises ${fallbackTest.questionCount || 20} questions worth ${fallbackTest.totalMarks} marks.`,
+                `Total duration is strictly ${fallbackTest.duration} minutes.`,
+                `Each correct response is awarded ${(fallbackTest.totalMarks / (fallbackTest.questionCount || 20)).toFixed(2)} marks.`,
+                `Negative marking of ${fallbackTest.negativeMarks} marks will be deducted for incorrect answers.`,
+                `Navigate between questions using the Question Palette or Next / Previous buttons.`,
+              ],
+            });
+          } else {
+            setErrorMessage('Test not found or unavailable.');
+          }
         }
       } catch (err) {
         setErrorMessage('Failed to load examination instructions.');
@@ -40,6 +72,11 @@ export const TestInstructionsPage: React.FC<{ testId: string }> = ({ testId }) =
     setErrorMessage(null);
 
     try {
+      // If user is not authenticated yet, automatically create a genuine guest session
+      if (!user) {
+        await guestLogin();
+      }
+
       const token = localStorage.getItem('abhi_token');
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -60,7 +97,7 @@ export const TestInstructionsPage: React.FC<{ testId: string }> = ({ testId }) =
         attemptId = json.attemptId;
       }
 
-      // If backend was unreachable or returned 401/404 on static hosts, generate client session
+      // If backend was unreachable or returned error on static hosts, generate client session
       if (!attemptId) {
         const fallback = (await import('../lib/fallbackData')).startFallbackTestAttempt(testId);
         attemptId = fallback.attemptId;

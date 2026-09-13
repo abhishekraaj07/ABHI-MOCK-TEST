@@ -109,6 +109,27 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
     });
 
     if (!attempt) {
+      // Check if id is actually a testId
+      const test = await prisma.test.findUnique({ where: { id } });
+      if (test) {
+        let existing = await prisma.attempt.findFirst({
+          where: { userId, testId: test.id, status: 'IN_PROGRESS' },
+          select: { id: true },
+        });
+        if (!existing) {
+          existing = await prisma.attempt.create({
+            data: {
+              userId,
+              testId: test.id,
+              status: 'IN_PROGRESS',
+              startedAt: new Date(),
+            },
+            select: { id: true },
+          });
+        }
+        return res.redirect(307, `/api/attempts/${existing.id}`);
+      }
+
       return res.status(404).json({
         success: false,
         error: { code: 'ATTEMPT_NOT_FOUND', message: 'Test attempt not found.' },

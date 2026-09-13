@@ -97,11 +97,15 @@ export const Navbar: React.FC = () => {
                   {user.name.charAt(0).toUpperCase()}
                 </span>
                 <span className="hidden sm:inline-block max-w-[120px] truncate">{user.name}</span>
-                {user.role === 'ADMIN' && (
+                {user.isGuest ? (
+                  <span className="inline-block rounded bg-amber-100 dark:bg-amber-950 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-300">
+                    Guest
+                  </span>
+                ) : user.role === 'ADMIN' ? (
                   <span className="hidden sm:inline-block rounded bg-red-100 dark:bg-red-950 px-1.5 py-0.5 text-[10px] font-bold text-red-700 dark:text-red-400">
                     ADMIN
                   </span>
-                )}
+                ) : null}
               </button>
 
               {userDropdownOpen && (
@@ -112,8 +116,25 @@ export const Navbar: React.FC = () => {
                   />
                   <div className="absolute right-0 mt-2 w-56 rounded border border-[var(--line)] bg-[var(--surface)] py-1 shadow-lg z-50 text-sm text-[var(--ink)]">
                     <div className="border-b border-[var(--line)] px-4 py-2">
-                      <p className="font-semibold truncate">{user.name}</p>
-                      <p className="text-xs opacity-60 truncate">{user.email}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold truncate">{user.name}</p>
+                        {user.isGuest && (
+                          <span className="rounded bg-amber-100 dark:bg-amber-950 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-300">
+                            Guest
+                          </span>
+                        )}
+                      </div>
+                      {user.isGuest ? (
+                        <Link
+                          href="/register"
+                          onClick={() => setUserDropdownOpen(false)}
+                          className="mt-1 block text-xs font-semibold text-[var(--accent)] hover:underline"
+                        >
+                          Create account to save progress →
+                        </Link>
+                      ) : (
+                        <p className="text-xs opacity-60 truncate">{user.email}</p>
+                      )}
                     </div>
 
                     <Link

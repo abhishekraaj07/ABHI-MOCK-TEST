@@ -18,6 +18,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (name: string, email: string, password: string, confirmPassword?: string) => Promise<{ success: boolean; error?: string }>;
+  guestLogin: () => Promise<{ success: boolean; error?: string }>;
   signInWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   updateProfileName: (name: string) => Promise<boolean>;
@@ -122,6 +123,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Genuine Guest Mode (server-side session via HTTP-only cookie, or edge fallback)
+  const guestLogin = async () => {
+    try {
+      const res = await fetch('/api/auth/guest-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          setUser(data.user);
+          return { success: true };
+        }
+      }
+
+      // Edge/fallback guest session
+      const fallbackGuest: User = {
+        id: `guest_${Date.now()}`,
+        name: 'Guest Aspirant',
+        email: `guest_${Date.now()}@guest.abhimocktest.com`,
+        role: 'USER',
+        isGuest: true,
+      };
+      setUser(fallbackGuest);
+      return { success: true };
+    } catch (err: any) {
+      const fallbackGuest: User = {
+        id: `guest_${Date.now()}`,
+        name: 'Guest Aspirant',
+        email: `guest_${Date.now()}@guest.abhimocktest.com`,
+        role: 'USER',
+        isGuest: true,
+      };
+      setUser(fallbackGuest);
+      return { success: true };
+    }
+  };
+
   // Google Sign-In with Firebase Auth & Server ID Token Verification
   const signInWithGoogle = async () => {
     try {
@@ -223,6 +264,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         login,
         register,
+        guestLogin,
         signInWithGoogle,
         logout,
         updateProfileName,

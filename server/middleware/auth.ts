@@ -7,6 +7,7 @@ export interface AuthUser {
   name: string;
   email: string;
   role: string;
+  isGuest?: boolean;
 }
 
 export interface AuthRequest extends Request {
@@ -43,7 +44,7 @@ export const AUTH_COOKIE_OPTIONS = {
 
 export function signToken(user: AuthUser): string {
   return jwt.sign(
-    { id: user.id, email: user.email, name: user.name, role: user.role },
+    { id: user.id, email: user.email, name: user.name, role: user.role, isGuest: Boolean(user.isGuest) },
     JWT_SECRET,
     { expiresIn: '7d' }
   );
@@ -73,7 +74,7 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
     const decoded = jwt.verify(token, JWT_SECRET) as any;
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      select: { id: true, name: true, email: true, role: true },
+      select: { id: true, name: true, email: true, role: true, isGuest: true },
     });
 
     if (!user) {
@@ -112,7 +113,7 @@ export async function optionalAuth(req: AuthRequest, res: Response, next: NextFu
       const decoded = jwt.verify(token, JWT_SECRET) as any;
       const user = await prisma.user.findUnique({
         where: { id: decoded.id },
-        select: { id: true, name: true, email: true, role: true },
+        select: { id: true, name: true, email: true, role: true, isGuest: true },
       });
       if (user) {
         req.user = user;
@@ -125,7 +126,7 @@ export async function optionalAuth(req: AuthRequest, res: Response, next: NextFu
 }
 
 export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
-  if (!req.user || req.user.role !== 'ADMIN') {
+  if (!req.user || req.user.role !== 'ADMIN' || req.user.isGuest) {
     return res.status(403).json({
       success: false,
       error: {

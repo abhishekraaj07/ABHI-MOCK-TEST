@@ -3,6 +3,7 @@ export interface User {
   name: string;
   email: string;
   role: 'USER' | 'ADMIN';
+  isGuest?: boolean;
   photoURL?: string | null;
   firebaseUid?: string | null;
   createdAt?: string;
