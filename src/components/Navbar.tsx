@@ -23,7 +23,6 @@ export const Navbar: React.FC = () => {
     { name: 'Mock Tests', href: '/mock-tests' },
     { name: 'Practice', href: '/practice' },
     { name: 'Daily Sprint', href: '/daily-challenge', isDaily: true },
-    { name: 'AI Mentor', href: '/mentor', isGemini: true },
     { name: 'Leaderboard', href: '/leaderboard' },
   ];
 
@@ -162,15 +161,6 @@ export const Navbar: React.FC = () => {
                     >
                       <FileText size={16} className="text-[var(--accent)]" />
                       My Test History
-                    </Link>
-
-                    <Link
-                      href="/mentor"
-                      onClick={() => setUserDropdownOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2 hover:bg-[var(--paper)] transition-colors text-[var(--accent)] font-semibold"
-                    >
-                      <Sparkles size={16} />
-                      AI Mentor (Gemini)
                     </Link>
 
                     <Link

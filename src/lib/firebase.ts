@@ -38,6 +38,14 @@ const firebaseConfig = {
     'development-placeholder-key',
 };
 
+// Check whether Firebase has a genuinely configured API key
+export const isFirebaseConfigured: boolean = Boolean(
+  firebaseConfig.apiKey &&
+  !firebaseConfig.apiKey.includes('your-') &&
+  !firebaseConfig.apiKey.includes('placeholder') &&
+  firebaseConfig.apiKey.length > 20
+);
+
 // Initialize Firebase App singleton safely
 export const app: FirebaseApp =
   getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();

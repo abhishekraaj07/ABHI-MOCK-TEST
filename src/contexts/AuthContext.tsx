@@ -5,6 +5,7 @@ import {
   auth,
   googleProvider,
   syncUserToFirestore,
+  isFirebaseConfigured,
 } from '../lib/firebase';
 import {
   signInWithPopup,
@@ -180,6 +181,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Google Sign-In with Firebase Auth & Server ID Token Verification
   const signInWithGoogle = async () => {
+    if (!isFirebaseConfigured) {
+      return {
+        success: false,
+        error: 'Google Sign-In is not configured on this deployment. Please sign in with Email & Password or click "Guest Mode" for instant access.',
+      };
+    }
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const fbUser: FirebaseUser = result.user;

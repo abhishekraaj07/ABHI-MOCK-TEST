@@ -32,7 +32,6 @@ const PrivacyPage = React.lazy(() => import('./pages/PrivacyPage'));
 const TermsPage = React.lazy(() => import('./pages/TermsPage'));
 const AnalyticsPage = React.lazy(() => import('./pages/AnalyticsPage'));
 const SettingsPage = React.lazy(() => import('./pages/SettingsPage'));
-const MentorPage = React.lazy(() => import('./pages/MentorPage'));
 const WrongQuestionsPage = React.lazy(() => import('./pages/WrongQuestionsPage'));
 const DailyChallengePage = React.lazy(() => import('./pages/DailyChallengePage'));
 const CustomTestBuilderPage = React.lazy(() => import('./pages/CustomTestBuilderPage'));
@@ -51,7 +50,7 @@ const AppContent: React.FC = () => {
     if (currentPath === '/') return <LandingPage />;
     if (currentPath === '/exams') return <ExamsPage />;
     if (currentPath === '/mock-tests' || currentPath === '/tests') return <MockTestsPage />;
-    if (currentPath === '/dashboard') return <DashboardPage />;
+    if (currentPath === '/dashboard' || currentPath === '/mentor' || currentPath === '/ai-tutor') return <DashboardPage />;
     if (currentPath === '/my-tests') return <MyTestsPage />;
     if (currentPath === '/practice') return <PracticePage />;
     if (currentPath === '/bookmarks') return <BookmarksPage />;
@@ -60,7 +59,6 @@ const AppContent: React.FC = () => {
       return <DailyChallengePage />;
     }
     if (currentPath === '/custom-test' || currentPath === '/create-test') return <CustomTestBuilderPage />;
-    if (currentPath === '/mentor' || currentPath === '/ai-tutor') return <MentorPage />;
     if (currentPath === '/leaderboard') return <LeaderboardPage />;
     if (currentPath === '/profile') return <ProfilePage />;
     if (currentPath === '/analytics') return <AnalyticsPage />;

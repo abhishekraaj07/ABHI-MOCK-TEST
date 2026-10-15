@@ -23,7 +23,6 @@ import {
 import { QuestionReportModal } from '../components/QuestionReportModal';
 import { useAuth } from '../contexts/AuthContext';
 import { persistAttemptToFirestore } from '../lib/firebase';
-import { GeminiChatbot } from '../components/GeminiChatbot';
 import {
   BarChart,
   Bar,
@@ -44,7 +43,6 @@ export const ResultPage: React.FC<{ attemptId: string }> = ({ attemptId }) => {
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'CORRECT' | 'WRONG' | 'UNANSWERED' | 'MARKED'>('ALL');
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
   const [retaking, setRetaking] = useState(false);
-  const [aiTutorQuestion, setAiTutorQuestion] = useState<QuestionReviewItem | null>(null);
   const [reportingQuestion, setReportingQuestion] = useState<QuestionReviewItem | null>(null);
 
   // Animated count-up score (§2 & §10)
@@ -701,14 +699,6 @@ export const ResultPage: React.FC<{ attemptId: string }> = ({ attemptId }) => {
                             <Flag size={12} />
                             <span>Report Error</span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => setAiTutorQuestion(q)}
-                            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20 border border-[var(--accent)]/20 transition-colors text-[11px] font-semibold"
-                          >
-                            <Sparkles size={12} />
-                            <span>Ask Gemini AI Tutor</span>
-                          </button>
                         </div>
                       </div>
                       <p className="text-xs opacity-90 leading-relaxed font-sans">
@@ -727,50 +717,6 @@ export const ResultPage: React.FC<{ attemptId: string }> = ({ attemptId }) => {
           })}
         </div>
       </div>
-
-      {/* Gemini AI Tutor Question Dissector Modal */}
-      {aiTutorQuestion && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="w-full max-w-3xl rounded-xl border border-[var(--line)] bg-[var(--surface)] shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between border-b border-[var(--line)] bg-[var(--paper)] px-4 py-3">
-              <div className="flex items-center gap-2">
-                <div className="h-7 w-7 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] flex items-center justify-center">
-                  <Sparkles size={16} />
-                </div>
-                <div>
-                  <h3 className="font-serif font-bold text-sm text-[var(--ink)]">
-                    Gemini AI Question Assistant
-                  </h3>
-                  <p className="text-[10px] text-[var(--ink)] opacity-60">
-                    Question #{aiTutorQuestion.index} ({aiTutorQuestion.subjectName} • {aiTutorQuestion.topicName})
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setAiTutorQuestion(null)}
-                className="rounded p-1 text-[var(--ink)] opacity-60 hover:opacity-100 hover:bg-[var(--line)]/50"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-hidden p-2">
-              <GeminiChatbot
-                initialPersona="question-explainer"
-                initialQuestionContext={`Question: "${aiTutorQuestion.questionText}". Options: ${aiTutorQuestion.options
-                  .map((o) => `${o.optionKey}: ${o.optionText}`)
-                  .join(' | ')}. Correct Answer is: ${aiTutorQuestion.correctOptionKey} (${
-                  aiTutorQuestion.correctOptionText
-                }). Candidate chose: ${aiTutorQuestion.selectedOption || 'Unanswered'}. Explanation: ${
-                  aiTutorQuestion.explanation
-                }`}
-              />
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Question Error Reporting Modal */}
       {reportingQuestion && (

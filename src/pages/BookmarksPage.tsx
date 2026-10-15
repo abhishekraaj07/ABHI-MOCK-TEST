@@ -10,7 +10,6 @@ import {
   Filter,
   Layers,
 } from 'lucide-react';
-import { GeminiChatbot } from '../components/GeminiChatbot';
 import { QuestionReportModal } from '../components/QuestionReportModal';
 import { useAuth } from '../contexts/AuthContext';
 import { apiFetch } from '../lib/api';
@@ -20,7 +19,6 @@ export const BookmarksPage: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
   const [bookmarks, setBookmarks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [aiTutorQuestion, setAiTutorQuestion] = useState<any | null>(null);
   const [reportingQuestion, setReportingQuestion] = useState<any | null>(null);
 
   // Filters
@@ -339,60 +337,12 @@ export const BookmarksPage: React.FC = () => {
                     <div className="font-bold uppercase tracking-wider text-[10px] text-[var(--accent)]">
                       Solution Reference
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setAiTutorQuestion(b)}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20 border border-[var(--accent)]/20 transition-colors text-[11px] font-semibold"
-                    >
-                      <Sparkles size={12} />
-                      <span>Ask Gemini AI Mentor</span>
-                    </button>
                   </div>
                   <p className="opacity-90 leading-relaxed font-sans">{b.explanation}</p>
                 </div>
               )}
             </div>
           ))}
-        </div>
-      )}
-
-      {/* Gemini AI Question Dissector Modal */}
-      {aiTutorQuestion && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="w-full max-w-3xl rounded-xl border border-[var(--line)] bg-[var(--surface)] shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between border-b border-[var(--line)] bg-[var(--paper)] px-4 py-3">
-              <div className="flex items-center gap-2">
-                <div className="h-7 w-7 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] flex items-center justify-center">
-                  <Sparkles size={16} />
-                </div>
-                <div>
-                  <h3 className="font-serif font-bold text-sm text-[var(--ink)]">
-                    Gemini AI Question Dissector
-                  </h3>
-                  <p className="text-[10px] text-[var(--ink)] opacity-60">
-                    {aiTutorQuestion.subjectName} • {aiTutorQuestion.topicName} ({aiTutorQuestion.examName})
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setAiTutorQuestion(null)}
-                className="rounded p-1 text-[var(--ink)] opacity-60 hover:opacity-100 hover:bg-[var(--line)]/50"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-hidden p-2">
-              <GeminiChatbot
-                initialPersona="question-explainer"
-                initialQuestionContext={`Question: "${aiTutorQuestion.questionText}". Options: ${aiTutorQuestion.options
-                  .map((o: any) => `${o.optionKey}: ${o.optionText}`)
-                  .join(' | ')}. Explanation: ${aiTutorQuestion.explanation || 'None provided'}`}
-              />
-            </div>
-          </div>
         </div>
       )}
 
