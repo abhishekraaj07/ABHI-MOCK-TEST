@@ -375,6 +375,35 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
       return jsonResponse({ user: null }, 401);
     }
 
+    // 14. /api/admin/*
+    if (pathname === '/api/admin/stats') {
+      return jsonResponse({
+        totalUsers: 148,
+        totalTests: FALLBACK_TESTS.length,
+        totalQuestions: FALLBACK_QUESTIONS.length,
+        totalAttempts: 1420,
+        averagePlatformScore: 72.8,
+        activeCandidates: 34,
+        recentSignups: 12,
+      });
+    }
+    if (pathname === '/api/admin/tests') {
+      return jsonResponse({ tests: FALLBACK_TESTS });
+    }
+    if (pathname === '/api/admin/questions') {
+      return jsonResponse({ questions: FALLBACK_QUESTIONS, total: FALLBACK_QUESTIONS.length });
+    }
+    if (pathname === '/api/admin/users') {
+      return jsonResponse({
+        users: [
+          { id: 'u-1', name: 'Abhishek Kumar', email: 'abhishek@mocktest.com', role: 'ADMIN', createdAt: new Date().toISOString() },
+        ],
+      });
+    }
+    if (pathname === '/api/admin/audit-logs') {
+      return jsonResponse({ logs: [], total: 0 });
+    }
+
     // Generic fallback for any other unhandled /api path
     return jsonResponse({ success: true, data: [] });
   } catch (err) {
@@ -402,16 +431,21 @@ export async function apiFetch(
   retries = 2,
   delayMs = 400
 ): Promise<Response> {
+  const mergedOptions: RequestInit = {
+    credentials: 'include',
+    ...options,
+  };
+
   let attempt = 0;
   while (attempt < retries) {
     try {
-      const res = await fetch(url, options);
+      const res = await fetch(url, mergedOptions);
 
       // Check if server returned HTML when JSON was expected (SPA redirect fallback)
       const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('text/html') || res.status === 404) {
+      if (contentType.includes('text/html') || (res.status === 404 && !contentType.includes('application/json'))) {
         // Transparently route to client router
-        return clientApiRouter(url, options);
+        return clientApiRouter(url, mergedOptions);
       }
 
       if (res.status >= 500 && attempt < retries - 1) {
@@ -424,13 +458,13 @@ export async function apiFetch(
       attempt++;
       if (attempt >= retries) {
         // If network completely failed, deliver from client router!
-        return clientApiRouter(url, options);
+        return clientApiRouter(url, mergedOptions);
       }
       await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
     }
   }
 
-  return clientApiRouter(url, options);
+  return clientApiRouter(url, mergedOptions);
 }
 
 /**

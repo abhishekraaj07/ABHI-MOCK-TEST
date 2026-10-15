@@ -175,7 +175,8 @@ export const DailyChallengePage: React.FC = () => {
         credentials: 'include',
         body: JSON.stringify({
           challengeId: data.challenge.id,
-          answers: formattedAnswers,
+          answers: selectedAnswers,
+          answerList: formattedAnswers,
           timeTaken: elapsedSeconds,
         }),
       });

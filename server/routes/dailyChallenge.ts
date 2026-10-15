@@ -224,8 +224,19 @@ router.post('/submit', authenticate, async (req: AuthRequest, res: Response) => 
       });
     }
 
-    // Evaluate answers
-    const userAnswers = answers && typeof answers === 'object' ? answers : {};
+    // Evaluate answers: support both Object map and Array of objects [{ questionId, selectedOption }]
+    const userAnswers: Record<string, string> = {};
+    if (Array.isArray(answers)) {
+      answers.forEach((ans: any) => {
+        const qId = ans?.questionId || ans?.id;
+        const opt = ans?.selectedOption ?? ans?.selectedAnswer ?? ans?.optionKey;
+        if (qId && typeof opt === 'string') {
+          userAnswers[qId] = opt;
+        }
+      });
+    } else if (answers && typeof answers === 'object') {
+      Object.assign(userAnswers, answers);
+    }
     let correctCount = 0;
     let wrongCount = 0;
     const totalQuestions = challenge.questions.length;

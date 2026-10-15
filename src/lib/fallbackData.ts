@@ -266,7 +266,19 @@ export function submitFallbackDailyChallenge(payload: {
 }): any {
   const today = new Date().toISOString().slice(0, 10);
   const challenge = getFallbackDailyChallenge();
-  const answers = payload.answers || {};
+  const rawAnswers: any = payload.answers || (payload as any).answerList || {};
+  const answers: Record<string, string> = {};
+  if (Array.isArray(rawAnswers)) {
+    rawAnswers.forEach((ans: any) => {
+      const qId = ans?.questionId || ans?.id;
+      const opt = ans?.selectedOption ?? ans?.selectedAnswer ?? ans?.optionKey;
+      if (qId && typeof opt === 'string') {
+        answers[qId] = opt;
+      }
+    });
+  } else if (rawAnswers && typeof rawAnswers === 'object') {
+    Object.assign(answers, rawAnswers);
+  }
 
   let correctCount = 0;
   let incorrectCount = 0;
@@ -301,7 +313,7 @@ export function submitFallbackDailyChallenge(payload: {
   });
 
   const rawScore = correctCount * 1 - incorrectCount * 0.25;
-  const score = Math.max(0, Math.round(rawScore * 100) / 100);
+  const score = Math.round(rawScore * 100) / 100;
   const accuracy = (correctCount + incorrectCount) > 0
     ? Math.round((correctCount / (correctCount + incorrectCount)) * 100)
     : 0;

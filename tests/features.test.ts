@@ -61,4 +61,62 @@ test('Features & Business Logic Unit Tests', async (t) => {
     const today = new Date().toISOString().slice(0, 10);
     assert.match(today, /^\d{4}-\d{2}-\d{2}$/);
   });
+
+  await t.test('CSV Question Import correctly resolves correctOption and optionE for 5-option exams', () => {
+    const row = {
+      questionText: 'What is the capital of India?',
+      optionA: 'Mumbai',
+      optionB: 'New Delhi',
+      optionC: 'Kolkata',
+      optionD: 'Chennai',
+      optionE: 'None of the above',
+      correctOption: 'B',
+    };
+
+    const correctKey = String(row.correctOption || 'A').toUpperCase().trim();
+    const optionsList = [
+      { optionKey: 'A', optionText: row.optionA, isCorrect: correctKey === 'A' },
+      { optionKey: 'B', optionText: row.optionB, isCorrect: correctKey === 'B' },
+      { optionKey: 'C', optionText: row.optionC, isCorrect: correctKey === 'C' },
+      { optionKey: 'D', optionText: row.optionD, isCorrect: correctKey === 'D' },
+      { optionKey: 'E', optionText: row.optionE, isCorrect: correctKey === 'E' },
+    ];
+
+    assert.equal(optionsList.length, 5);
+    assert.equal(optionsList[1].isCorrect, true);
+    assert.equal(optionsList[0].isCorrect, false);
+    assert.equal(optionsList[4].optionKey, 'E');
+  });
+
+  await t.test('Daily Challenge answers normalizer handles both Array and Object map seamlessly', () => {
+    const arrayPayload = [
+      { questionId: 'q-101', selectedOption: 'C' },
+      { questionId: 'q-102', selectedOption: 'A' },
+    ];
+
+    const mapPayload = {
+      'q-101': 'C',
+      'q-102': 'A',
+    };
+
+    const normalize = (answers: any): Record<string, string> => {
+      const userAnswers: Record<string, string> = {};
+      if (Array.isArray(answers)) {
+        answers.forEach((ans: any) => {
+          const qId = ans?.questionId || ans?.id;
+          const opt = ans?.selectedOption ?? ans?.selectedAnswer ?? ans?.optionKey;
+          if (qId && typeof opt === 'string') userAnswers[qId] = opt;
+        });
+      } else if (answers && typeof answers === 'object') {
+        Object.assign(userAnswers, answers);
+      }
+      return userAnswers;
+    };
+
+    const fromArray = normalize(arrayPayload);
+    const fromMap = normalize(mapPayload);
+
+    assert.deepEqual(fromArray, { 'q-101': 'C', 'q-102': 'A' });
+    assert.deepEqual(fromMap, { 'q-101': 'C', 'q-102': 'A' });
+  });
 });

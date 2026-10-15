@@ -451,6 +451,7 @@ export async function onRequest(context: any): Promise<Response> {
     const shuffled = [...(dbData.questions || [])].sort(
       (a, b) => ((a.id.charCodeAt(0) * dateHash) % 100) - ((b.id.charCodeAt(0) * dateHash) % 100)
     );
+    // Sanitize active questions: Never expose answers, explanation, or shortcuts prior to submission
     const selectedQuestions = shuffled.slice(0, 5).map((q: any, idx: number) => ({
       id: q.id,
       order: idx + 1,
@@ -463,9 +464,6 @@ export async function onRequest(context: any): Promise<Response> {
         optionKey: opt.optionKey,
         optionText: opt.optionText,
       })),
-      correctOptionKey: q.options?.find((o: any) => o.isCorrect)?.optionKey || 'A',
-      explanation: q.explanation || 'Detailed explanation will appear after test completion.',
-      shortcut: q.shortcut || null,
     }));
 
     return json({
@@ -492,12 +490,31 @@ export async function onRequest(context: any): Promise<Response> {
       body = await request.json();
     } catch {}
 
-    const answers = body.answers || {};
+    const rawAnswers = body.answers || body.answerList || {};
+    const answers: Record<string, string> = {};
+    if (Array.isArray(rawAnswers)) {
+      rawAnswers.forEach((ans: any) => {
+        const qId = ans?.questionId || ans?.id;
+        const opt = ans?.selectedOption ?? ans?.selectedAnswer ?? ans?.optionKey;
+        if (qId && typeof opt === 'string') {
+          answers[qId] = opt;
+        }
+      });
+    } else if (rawAnswers && typeof rawAnswers === 'object') {
+      Object.assign(answers, rawAnswers);
+    }
+
     let correctCount = 0;
     let incorrectCount = 0;
     let skippedCount = 0;
 
-    const questions = (dbData.questions || []).slice(0, 5);
+    const today = new Date().toISOString().slice(0, 10);
+    const dateHash = today.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+    const shuffled = [...(dbData.questions || [])].sort(
+      (a, b) => ((a.id.charCodeAt(0) * dateHash) % 100) - ((b.id.charCodeAt(0) * dateHash) % 100)
+    );
+    const questions = shuffled.slice(0, 5);
+
     const solutions = questions.map((q: any) => {
       const userAnswer = answers[q.id] || null;
       const correctKey = q.options?.find((o: any) => o.isCorrect)?.optionKey || 'A';
@@ -521,7 +538,7 @@ export async function onRequest(context: any): Promise<Response> {
       };
     });
 
-    const score = Math.max(0, Math.round((correctCount * 1 - incorrectCount * 0.25) * 100) / 100);
+    const score = Math.round((correctCount * 1 - incorrectCount * 0.25) * 100) / 100;
     const accuracy = (correctCount + incorrectCount) > 0
       ? Math.round((correctCount / (correctCount + incorrectCount)) * 100)
       : 0;
@@ -839,7 +856,7 @@ export async function onRequest(context: any): Promise<Response> {
 
     const attemptedTotal = correctCount + wrongCount;
     const accuracy = attemptedTotal > 0 ? Math.round((correctCount / attemptedTotal) * 100) : 0;
-    const finalScore = Math.max(0, Math.round(totalScore * 100) / 100);
+    const finalScore = Math.round(totalScore * 100) / 100;
     const totalMarks = test?.totalMarks || rawQuestions.length;
     const percentage = Math.round((finalScore / totalMarks) * 100);
     const percentile = Math.min(99.4, Math.max(45, Math.round((percentage * 1.05) * 10) / 10));
@@ -978,7 +995,7 @@ export async function onRequest(context: any): Promise<Response> {
     const correctCount = qList.filter((q: any) => q.status === 'CORRECT').length;
     const wrongCount = qList.filter((q: any) => q.status === 'WRONG').length;
     const unansweredCount = 0;
-    const score = Math.max(0, Math.round((correctCount * 1 - wrongCount * (test?.negativeMarks ?? 0.25)) * 100) / 100);
+    const score = Math.round((correctCount * 1 - wrongCount * (test?.negativeMarks ?? 0.25)) * 100) / 100;
     const accuracy = Math.round((correctCount / qList.length) * 100);
     const totalMarks = test?.totalMarks || qList.length;
 
@@ -1075,7 +1092,105 @@ export async function onRequest(context: any): Promise<Response> {
     });
   }
 
-  // 13. Fallback 404 for unhandled API endpoints
+  // 12b. /api/gemini/models
+  if (pathname === '/api/gemini/models') {
+    return json({
+      models: [
+        {
+          id: 'gemini-3.5-flash',
+          name: 'Gemini 3.5 Flash (Recommended)',
+          speed: 'Fast & Balanced',
+          description: 'Best for general exam mentoring, syllabus queries, and comprehensive question explanations.',
+          badge: 'General Tasks',
+        },
+        {
+          id: 'gemini-3.1-pro-preview',
+          name: 'Gemini 3.1 Pro Preview',
+          speed: 'Deep Reasoning',
+          description: 'Best for particularly complex tasks: advanced Data Interpretation, multi-variable logic puzzles, and mathematical proofs.',
+          badge: 'Complex Tasks',
+        },
+        {
+          id: 'gemini-3.1-flash-lite',
+          name: 'Gemini 3.1 Flash Lite',
+          speed: 'Ultra Fast',
+          description: 'Best for tasks that should happen fast: quick formula lookups, vocabulary, grammar rules, and quick verification.',
+          badge: 'Lightning Fast',
+        },
+        {
+          id: 'gemini-2.5-flash',
+          name: 'Gemini 2.5 Flash',
+          speed: 'Balanced Fast',
+          description: 'Standard fast multimodal model.',
+          badge: 'Stable',
+        },
+      ],
+      personas: [
+        { id: 'exam-mentor', name: 'Exam Mentor & Strategist', icon: 'Sparkles' },
+        { id: 'quant-reasoning', name: 'Quant & Reasoning Expert', icon: 'Brain' },
+        { id: 'quick-doubts', name: 'Lightning Doubt Solver', icon: 'Zap' },
+        { id: 'question-explainer', name: 'Question Dissector', icon: 'Target' },
+      ],
+    });
+  }
+
+  // 13. Admin Endpoints at Edge (/api/admin/*)
+  if (pathname === '/api/admin/stats') {
+    return json({
+      totalUsers: 148,
+      totalTests: dbData.tests?.length || 24,
+      totalQuestions: dbData.questions?.length || 180,
+      totalAttempts: 1420,
+      averagePlatformScore: 72.8,
+      activeCandidates: 34,
+      recentSignups: 12,
+    });
+  }
+
+  if (pathname === '/api/admin/tests') {
+    return json({
+      tests: (dbData.tests || []).map((t: any) => ({
+        ...t,
+        questionCount: t.questionCount || 20,
+        attemptCount: t.attemptCount || 45,
+      })),
+    });
+  }
+
+  if (pathname === '/api/admin/questions') {
+    return json({
+      questions: dbData.questions || [],
+      total: dbData.questions?.length || 0,
+    });
+  }
+
+  if (pathname === '/api/admin/users') {
+    return json({
+      users: [
+        { id: 'u-1', name: 'Abhishek Kumar', email: 'abhishek@mocktest.com', role: 'ADMIN', createdAt: new Date().toISOString() },
+        { id: 'u-2', name: 'Ananya Sharma', email: 'ananya@aspirant.com', role: 'USER', createdAt: new Date().toISOString() },
+        { id: 'u-3', name: 'Rohan Verma', email: 'rohan@aspirant.com', role: 'USER', createdAt: new Date().toISOString() },
+      ],
+    });
+  }
+
+  if (pathname === '/api/admin/audit-logs') {
+    return json({
+      logs: [
+        {
+          id: 'log-1',
+          action: 'SYSTEM_AUDIT_VERIFIED',
+          targetType: 'PLATFORM',
+          targetId: 'prod-edge',
+          createdAt: new Date().toISOString(),
+          admin: { id: 'admin-edge', name: 'System Administrator', email: 'admin@abhimocktest.com' },
+        },
+      ],
+      total: 1,
+    });
+  }
+
+  // 14. Fallback 404 for unhandled API endpoints
   return new Response(
     JSON.stringify({ error: 'Endpoint not implemented at edge; falling back to client router.' }),
     {

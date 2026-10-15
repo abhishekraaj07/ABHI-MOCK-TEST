@@ -8,9 +8,14 @@ const router = Router();
 // - gemini-3.5-flash: For general tasks (comprehensive exam mentoring, question explanation)
 // - gemini-3.1-flash-lite: For tasks that should happen fast (quick doubt clearing, formula lookup)
 export const SUPPORTED_MODELS = [
+  'gemini-3.5-flash',
+  'gemini-3.1-pro-preview',
+  'gemini-3.1-flash-lite',
   'gemini-2.5-flash',
   'gemini-2.5-pro',
   'gemini-2.0-flash',
+  'gemini-1.5-flash',
+  'gemini-1.5-pro',
 ] as const;
 
 export type SupportedModel = typeof SUPPORTED_MODELS[number];

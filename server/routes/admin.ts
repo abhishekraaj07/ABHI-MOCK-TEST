@@ -922,7 +922,7 @@ router.post('/questions/import', async (req: AuthRequest, res: Response) => {
           isCorrect: Boolean(o.isCorrect),
         }));
       } else if (item.optionA && item.optionB) {
-        const correctKey = String(item.correctAnswer || item.correctKey || 'A').toUpperCase().trim();
+        const correctKey = String(item.correctOption || item.correctAnswer || item.correctKey || item.correct || 'A').toUpperCase().trim();
         optionsList = [
           { optionKey: 'A', optionText: String(item.optionA).trim(), isCorrect: correctKey === 'A' },
           { optionKey: 'B', optionText: String(item.optionB).trim(), isCorrect: correctKey === 'B' },
@@ -932,6 +932,9 @@ router.post('/questions/import', async (req: AuthRequest, res: Response) => {
         }
         if (item.optionD) {
           optionsList.push({ optionKey: 'D', optionText: String(item.optionD).trim(), isCorrect: correctKey === 'D' });
+        }
+        if (item.optionE) {
+          optionsList.push({ optionKey: 'E', optionText: String(item.optionE).trim(), isCorrect: correctKey === 'E' });
         }
       }
 
