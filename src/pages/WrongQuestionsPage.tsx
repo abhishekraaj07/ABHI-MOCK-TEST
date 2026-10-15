@@ -320,14 +320,6 @@ export const WrongQuestionsPage: React.FC = () => {
                 <span className="text-xs font-bold uppercase tracking-wider text-[var(--accent)]">
                   Explanation & Concept
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setAiTutorQuestion(activeDrillQuestion)}
-                  className="flex items-center gap-1.5 px-2 py-1 rounded bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-colors text-[11px] font-semibold"
-                >
-                  <Sparkles size={12} />
-                  <span>Explain with Gemini</span>
-                </button>
               </div>
               <p className="text-xs text-[var(--ink)] opacity-90 leading-relaxed font-sans">
                 {activeDrillQuestion.explanation}

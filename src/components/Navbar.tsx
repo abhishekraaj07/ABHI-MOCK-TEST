@@ -57,14 +57,8 @@ export const Navbar: React.FC = () => {
                     : 'border-transparent text-[var(--ink)] opacity-80 hover:opacity-100 hover:text-[var(--accent)]'
                 }`}
               >
-                {link.isGemini && <Sparkles size={13} className="text-[var(--accent)]" />}
                 {link.isDaily && <Flame size={13} className="text-amber-500 fill-current animate-pulse" />}
                 <span>{link.name}</span>
-                {link.isGemini && (
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 leading-none">
-                    Gemini
-                  </span>
-                )}
               </Link>
             );
           })}
