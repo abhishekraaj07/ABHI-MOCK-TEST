@@ -74,6 +74,22 @@ const EXAMS = [
     testCount: 1,
     questionCount: 20,
   },
+  {
+    id: 'bca-5th-sem-ccsu',
+    name: 'BCA 5th Semester (CCSU)',
+    slug: 'bca-5th-sem',
+    category: 'University Degree',
+    difficulty: 'Moderate',
+    description: 'Chaudhary Charan Singh University (CCSU) BCA 5th Semester comprehensive examination coverage with solved PYQs, subject drills, and semester practice tests.',
+    subjects: [
+      'DBMS (BCA-501)',
+      'Java & Webpage Design (BCA-502)',
+      'Computer Networks (BCA-503)',
+      'Numerical Methods (BCA-504)',
+    ],
+    testCount: 5,
+    questionCount: 20,
+  },
 ];
 
 function json(data: any, status = 200) {
@@ -118,12 +134,17 @@ function parseTestIdFromAttempt(attemptId: string): string {
   if (attemptId.startsWith('att_')) {
     const parts = attemptId.split('_');
     if (parts.length >= 3 && parts[1] !== 'edge') {
-      return parts.slice(1, parts.length - 1).join('_');
+      const parsed = parts.slice(1, parts.length - 1).join('_');
+      const direct = dbData.testsWithQuestions?.find((t: any) => t.id === parsed || t.slug === parsed);
+      if (direct) return direct.id;
+      const test = dbData.tests?.find((t: any) => t.id === parsed || t.slug === parsed);
+      if (test) return test.id;
+      return parsed;
     }
   }
   const directMatch = dbData.testsWithQuestions?.find((t: any) => t.id === attemptId);
   if (directMatch) return directMatch.id;
-  return dbData.testsWithQuestions?.[0]?.id || 'de94ec9c-7468-42bd-8206-20edf41c9295';
+  return dbData.testsWithQuestions?.[0]?.id || 'test-bca-dbms-01';
 }
 
 function generatePedagogicalFallback(prompt: string, _persona: string = 'exam-mentor'): string {
@@ -902,7 +923,7 @@ export async function onRequest(context: any): Promise<Response> {
       success: true,
       attemptId,
       status: 'COMPLETED',
-      result: fullResult,
+      ...fullResult,
     });
   }
 

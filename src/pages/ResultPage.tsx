@@ -87,32 +87,55 @@ export const ResultPage: React.FC<{ attemptId: string }> = ({ attemptId }) => {
         }
 
         if (json && isMounted) {
-          setData(json);
+          // Normalize if double nested: json.result.result
+          let normalized: any = json;
+          if (json.result && json.result.result) {
+            normalized = {
+              result: json.result.result,
+              subjectAnalysis: json.subjectAnalysis || json.result.subjectAnalysis || [],
+              questions: json.questions || json.result.questions || [],
+            };
+          }
+
+          if (normalized.result) {
+            normalized.result.score = typeof normalized.result.score === 'number' && !isNaN(normalized.result.score) ? normalized.result.score : 0;
+            normalized.result.totalMarks = Number(normalized.result.totalMarks) || 100;
+            normalized.result.percentage = typeof normalized.result.percentage === 'number' && !isNaN(normalized.result.percentage) ? normalized.result.percentage : Math.round((normalized.result.score / normalized.result.totalMarks) * 100);
+            normalized.result.accuracy = typeof normalized.result.accuracy === 'number' && !isNaN(normalized.result.accuracy) ? normalized.result.accuracy : 0;
+            normalized.result.correctCount = Number(normalized.result.correctCount) || 0;
+            normalized.result.wrongCount = Number(normalized.result.wrongCount) || 0;
+            normalized.result.unansweredCount = Number(normalized.result.unansweredCount) || 0;
+            normalized.result.timeTaken = Number(normalized.result.timeTaken) || 1200;
+            normalized.result.durationMinutes = Number(normalized.result.durationMinutes) || 60;
+            normalized.result.submittedAt = normalized.result.submittedAt || new Date().toISOString();
+          }
+
+          setData(normalized);
 
           // Persist attempt to Firestore under user document if user is logged in
-          if (user?.id && json.result) {
+          if (user?.id && normalized.result) {
             persistAttemptToFirestore(user.id, {
-              id: json.result.attemptId,
+              id: normalized.result.attemptId,
               userId: user.id,
-              testId: json.result.testId,
-              testTitle: json.result.testTitle,
-              examName: json.result.examName,
-              score: json.result.score,
-              totalMarks: json.result.totalMarks,
-              percentage: json.result.percentage,
-              accuracy: json.result.accuracy,
-              timeTaken: json.result.timeTaken,
+              testId: normalized.result.testId,
+              testTitle: normalized.result.testTitle,
+              examName: normalized.result.examName,
+              score: normalized.result.score,
+              totalMarks: normalized.result.totalMarks,
+              percentage: normalized.result.percentage,
+              accuracy: normalized.result.accuracy,
+              timeTaken: normalized.result.timeTaken,
               status: 'COMPLETED',
-              startedAt: json.result.startedAt,
-              submittedAt: json.result.submittedAt,
-              correctCount: json.result.correctCount,
-              wrongCount: json.result.wrongCount,
-              unansweredCount: json.result.unansweredCount,
+              startedAt: normalized.result.startedAt,
+              submittedAt: normalized.result.submittedAt,
+              correctCount: normalized.result.correctCount,
+              wrongCount: normalized.result.wrongCount,
+              unansweredCount: normalized.result.unansweredCount,
             });
           }
 
           // Animate score count-up
-          const target = json.result.score;
+          const target = normalized.result.score || 0;
           const duration = 1000;
           const steps = 40;
           const stepTime = duration / steps;
@@ -272,9 +295,10 @@ export const ResultPage: React.FC<{ attemptId: string }> = ({ attemptId }) => {
   ].filter((d) => d.value > 0);
 
   const formatSeconds = (sec: number) => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m}m ${s}s`;
+    const s = Number(sec) || 0;
+    const m = Math.floor(s / 60);
+    const rem = s % 60;
+    return `${m}m ${rem}s`;
   };
 
   return (
@@ -284,14 +308,14 @@ export const ResultPage: React.FC<{ attemptId: string }> = ({ attemptId }) => {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-[var(--line)] pb-5">
           <div>
             <div className="flex items-center gap-2 text-xs font-mono text-[var(--accent)] mb-1">
-              <span>{result.examName}</span> • <span>{result.subjectName}</span>
+              <span>{result.examName || 'Competitive Exam'}</span> • <span>{result.subjectName || 'Full Syllabus'}</span>
             </div>
             <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[var(--ink)]">
-              {result.testTitle}
+              {result.testTitle || 'Examination Result'}
             </h1>
             <p className="text-xs opacity-60 mt-1">
-              Submitted on {new Date(result.submittedAt).toLocaleDateString()} at{' '}
-              {new Date(result.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              Submitted on {result.submittedAt && !isNaN(new Date(result.submittedAt).getTime()) ? new Date(result.submittedAt).toLocaleDateString() : new Date().toLocaleDateString()} at{' '}
+              {result.submittedAt && !isNaN(new Date(result.submittedAt).getTime()) ? new Date(result.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </p>
           </div>
 
@@ -341,11 +365,11 @@ export const ResultPage: React.FC<{ attemptId: string }> = ({ attemptId }) => {
               Total Score
             </div>
             <div className="font-serif text-5xl sm:text-6xl font-bold text-[var(--accent)] tracking-tight">
-              {displayedScore}
+              {isNaN(displayedScore) ? (result.score || 0) : displayedScore}
             </div>
-            <div className="font-mono text-xs opacity-70">out of {result.totalMarks} marks</div>
+            <div className="font-mono text-xs opacity-70">out of {result.totalMarks || 100} marks</div>
             <div className="pt-2 text-xs font-mono font-semibold text-[var(--ink)]">
-              Percentage: {result.percentage}%
+              Percentage: {typeof result.percentage === 'number' && !isNaN(result.percentage) ? result.percentage : 0}%
             </div>
           </div>
 
@@ -354,10 +378,10 @@ export const ResultPage: React.FC<{ attemptId: string }> = ({ attemptId }) => {
             <div className="rounded border border-[var(--line)] bg-[var(--paper)] p-4 space-y-1">
               <div className="text-[10px] uppercase opacity-60 font-sans">Accuracy</div>
               <div className="font-serif text-2xl sm:text-3xl font-bold text-[var(--ink)]">
-                {result.accuracy}%
+                {typeof result.accuracy === 'number' && !isNaN(result.accuracy) ? result.accuracy : 0}%
               </div>
               <div className="text-[10px] opacity-60">
-                {result.correctCount} of {result.correctCount + result.wrongCount} attempted
+                {result.correctCount || 0} of {(result.correctCount || 0) + (result.wrongCount || 0)} attempted
               </div>
             </div>
 
@@ -366,7 +390,7 @@ export const ResultPage: React.FC<{ attemptId: string }> = ({ attemptId }) => {
               <div className="font-serif text-2xl sm:text-3xl font-bold text-[var(--ink)]">
                 {formatSeconds(result.timeTaken)}
               </div>
-              <div className="text-[10px] opacity-60">Limit: {result.durationMinutes} mins</div>
+              <div className="text-[10px] opacity-60">Limit: {result.durationMinutes || 60} mins</div>
             </div>
 
             <div className="rounded border border-[var(--line)] bg-[var(--paper)] p-4 space-y-1">

@@ -684,7 +684,15 @@ export function getFallbackTestResult(attemptId: string): any {
   try {
     const results = JSON.parse(localStorage.getItem('abhi_local_results') || '{}');
     if (results[attemptId]) {
-      return results[attemptId];
+      const r = results[attemptId];
+      if (r.result && r.result.result) {
+        return {
+          result: r.result.result,
+          subjectAnalysis: r.subjectAnalysis || r.result.subjectAnalysis || [],
+          questions: r.questions || r.result.questions || [],
+        };
+      }
+      return r;
     }
   } catch {}
 

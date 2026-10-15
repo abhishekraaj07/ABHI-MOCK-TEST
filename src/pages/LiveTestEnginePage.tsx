@@ -648,8 +648,9 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
         try {
           const json = await res.json();
           if (json.result) {
+            const resultData = json.result.result ? json.result : json;
             const existingResults = JSON.parse(localStorage.getItem('abhi_local_results') || '{}');
-            existingResults[attemptId] = json;
+            existingResults[attemptId] = resultData;
             localStorage.setItem('abhi_local_results', JSON.stringify(existingResults));
 
             const existingHistory = JSON.parse(localStorage.getItem('abhi_test_history') || '[]');
