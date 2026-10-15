@@ -75,6 +75,22 @@ export const FALLBACK_EXAMS: Exam[] = [
     testCount: 1,
     questionCount: 20,
   },
+  {
+    id: 'bca-5th-sem-ccsu',
+    name: 'BCA 5th Semester (CCSU)',
+    slug: 'bca-5th-sem',
+    category: 'University Degree',
+    difficulty: 'Moderate',
+    description: 'Chaudhary Charan Singh University (CCSU) BCA 5th Semester comprehensive examination coverage with solved PYQs, subject drills, and semester practice tests.',
+    subjects: [
+      'DBMS (BCA-501)',
+      'Java & Webpage Design (BCA-502)',
+      'Computer Networks (BCA-503)',
+      'Numerical Methods (BCA-504)',
+    ],
+    testCount: 5,
+    questionCount: 20,
+  },
 ];
 
 export const FALLBACK_TESTS = dbData.tests || [];
@@ -83,9 +99,9 @@ export const FALLBACK_QUESTIONS = dbData.questions || [];
 export const FALLBACK_TESTS_WITH_QUESTIONS = dbData.testsWithQuestions || [];
 
 export const FALLBACK_STATS = {
-  totalExams: 6,
-  totalTests: FALLBACK_TESTS.length || 26,
-  totalQuestions: FALLBACK_QUESTIONS.length || 120,
+  totalExams: FALLBACK_EXAMS.length,
+  totalTests: FALLBACK_TESTS.length || 31,
+  totalQuestions: FALLBACK_QUESTIONS.length || 140,
   availabilityRate: '99.98%',
 };
 
