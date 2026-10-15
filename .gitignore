@@ -36,3 +36,7 @@ Thumbs.db
 # IDE & Editor Directories
 .vscode/
 .idea/
+
+# Python
+__pycache__/
+*.pyc

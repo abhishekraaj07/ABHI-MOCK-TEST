@@ -88,8 +88,8 @@ export const FALLBACK_EXAMS: Exam[] = [
       'Computer Networks (BCA-503)',
       'Numerical Methods (BCA-504)',
     ],
-    testCount: 5,
-    questionCount: 20,
+    testCount: 10,
+    questionCount: 400,
   },
 ];
 
