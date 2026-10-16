@@ -519,19 +519,24 @@ export const ResultPage: React.FC<{ attemptId: string }> = ({ attemptId }) => {
                   <td className="py-3 px-4 text-[var(--signal-correct)] font-bold">{sub.correct}</td>
                   <td className="py-3 px-4 text-[var(--signal-wrong)] font-bold">{sub.wrong}</td>
                   <td className="py-3 px-4">
-                    <span
-                      className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
-                        sub.accuracy >= 70
-                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                          : sub.accuracy < 50
-                          ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
-                          : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                      }`}
-                    >
-                      {sub.accuracy}%
-                    </span>
+                    {(() => {
+                      const acc = typeof sub.accuracy === 'number' && !isNaN(sub.accuracy) ? sub.accuracy : 0;
+                      return (
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
+                            acc >= 70
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                              : acc < 50
+                              ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
+                              : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                          }`}
+                        >
+                          {acc}%
+                        </span>
+                      );
+                    })()}
                   </td>
-                  <td className="py-3 px-4 text-right font-bold">{sub.score}</td>
+                  <td className="py-3 px-4 text-right font-bold">{typeof sub.score === 'number' && !isNaN(sub.score) ? sub.score : 0}</td>
                 </tr>
               ))}
             </tbody>

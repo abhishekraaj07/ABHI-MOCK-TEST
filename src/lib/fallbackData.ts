@@ -133,7 +133,16 @@ export function getFallbackExamDetail(slugOrId: string): ExamDetail {
   };
 
   matchingTests.forEach((t: any) => {
-    const typeKey = (t.testType in testsGrouped ? t.testType : 'Full Length') as keyof typeof testsGrouped;
+    let typeKey: keyof typeof testsGrouped = 'Full Length';
+    if (t.testType === 'Sectional' || t.testType === 'Subject Test') {
+      typeKey = 'Sectional';
+    } else if (t.testType === 'Practice') {
+      typeKey = 'Practice';
+    } else if (t.testType === 'Previous Year' || t.testType === 'PYQ') {
+      typeKey = 'Previous Year';
+    } else if (t.testType in testsGrouped) {
+      typeKey = t.testType as keyof typeof testsGrouped;
+    }
     testsGrouped[typeKey].push({
       id: t.id,
       title: t.title,
@@ -154,12 +163,24 @@ export function getFallbackExamDetail(slugOrId: string): ExamDetail {
     });
   });
 
-  const subjects: SubjectDetail[] = (baseExam.subjects || []).map((subName: string, idx: number) => ({
-    id: `sub-${idx + 1}`,
-    name: subName,
-    questionCount: 20,
-    topics: ['Concept Drills', 'Previous Year Questions', 'Mock Practice'],
-  }));
+  const subjects: SubjectDetail[] = (baseExam.subjects || []).map((subName: string, idx: number) => {
+    const qCount = (FALLBACK_QUESTIONS || []).filter((q: any) => {
+      if (!q.subjectName && !q.subject?.name) return false;
+      const s = (q.subjectName || q.subject?.name || '').toLowerCase();
+      const target = subName.toLowerCase();
+      return s.includes(target) || target.includes(s) ||
+        (target.includes('dbms') && s.includes('dbms')) ||
+        (target.includes('java') && s.includes('java')) ||
+        (target.includes('network') && s.includes('network')) ||
+        (target.includes('numerical') && s.includes('numerical'));
+    }).length;
+    return {
+      id: `sub-${idx + 1}`,
+      name: subName,
+      questionCount: qCount > 0 ? qCount : 20,
+      topics: ['Concept Drills', 'Previous Year Questions', 'Mock Practice'],
+    };
+  });
 
   return {
     id: baseExam.id,
@@ -184,7 +205,7 @@ export function filterFallbackTests(query: Record<string, string>): any[] {
   if (tab === 'Full Tests') {
     list = list.filter((t) => t.testType === 'Full Length');
   } else if (tab === 'Sectional') {
-    list = list.filter((t) => t.testType === 'Sectional');
+    list = list.filter((t) => t.testType === 'Sectional' || t.testType === 'Subject Test');
   } else if (tab === 'Free') {
     list = list.filter((t) => !t.isPremium);
   } else if (tab === 'Premium') {
@@ -239,8 +260,8 @@ export function getFallbackDailyChallenge(): any {
     order: idx + 1,
     questionText: q.questionText,
     difficulty: q.difficulty || 'Moderate',
-    subjectName: q.subject?.name || 'General',
-    topicName: q.topic?.name || 'General',
+    subjectName: q.subjectName || q.subject?.name || 'General',
+    topicName: q.topicName || q.topic?.name || 'General',
     options: (q.options || []).map((opt: any) => ({
       id: opt.id,
       optionKey: opt.optionKey,
@@ -487,7 +508,16 @@ export function submitFallbackTestAttempt(attemptId: string, _timeSpent = 0): an
     attempt = existing[attemptId];
   } catch {}
 
+  let parsedTestId = attempt?.testId;
+  if (!parsedTestId && attemptId && attemptId.startsWith('att_')) {
+    const parts = attemptId.split('_');
+    if (parts.length >= 3 && parts[1] !== 'edge') {
+      parsedTestId = parts.slice(1, parts.length - 1).join('_');
+    }
+  }
+
   const testFull =
+    FALLBACK_TESTS_WITH_QUESTIONS.find((t) => t.id === parsedTestId || t.slug === parsedTestId) ||
     FALLBACK_TESTS_WITH_QUESTIONS.find((t) => t.id === attempt?.testId) ||
     FALLBACK_TESTS_WITH_QUESTIONS[0];
 

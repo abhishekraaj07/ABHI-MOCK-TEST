@@ -37,35 +37,110 @@ def main():
     with open(db_path, "r", encoding="utf-8") as f:
         db = json.load(f)
 
-    # Filter out non-BCA questions to retain existing IBPS/SSC/SBI questions
+    # Retain non-BCA questions
     non_bca_qs = [q for q in db.get("questions", []) if not (q.get("id", "").startswith("bca-") or "bca" in str(q.get("subjectId", "")))]
     print(f"Retained {len(non_bca_qs)} existing non-BCA questions.")
 
     combined_questions = non_bca_qs + all_bca_qs
     db["questions"] = combined_questions
 
-    # Map question IDs for quick lookup
     q_map = {q["id"]: q for q in combined_questions}
 
-    # Update practice categories
-    for pc in db.get("practiceCategories", []):
-        cid = pc.get("id")
-        if cid == "cat-bca-dbms":
-            pc["questionCount"] = 100
-        elif cid == "cat-bca-java":
-            pc["questionCount"] = 100
-        elif cid == "cat-bca-networks":
-            pc["questionCount"] = 100
-        elif cid == "cat-bca-numerical":
-            pc["questionCount"] = 100
+    print("--- 2. Building Rich Practice Categories with 5 Topics per Subject ---")
+    practice_cats = [
+        {
+            "id": "cat-bca-dbms",
+            "name": "DBMS (BCA-501)",
+            "questionCount": 100,
+            "topics": [
+                {"id": "top-dbms-1", "name": "Database Architecture, ANSI-SPARC & ER Modeling", "questionCount": 20},
+                {"id": "top-dbms-2", "name": "Relational Model, Constraints & Relational Algebra", "questionCount": 20},
+                {"id": "top-dbms-3", "name": "Functional Dependencies & Normalization (1NF - 5NF)", "questionCount": 20},
+                {"id": "top-dbms-4", "name": "SQL Commands, Views & Indexing Structures", "questionCount": 20},
+                {"id": "top-dbms-5", "name": "Transactions, ACID, Concurrency Control & Recovery", "questionCount": 20},
+            ]
+        },
+        {
+            "id": "cat-bca-java",
+            "name": "Java & Webpage Design (BCA-502)",
+            "questionCount": 100,
+            "topics": [
+                {"id": "top-java-1", "name": "JVM Architecture, Bytecode & Java Fundamentals", "questionCount": 20},
+                {"id": "top-java-2", "name": "Syntax, Operators, Strings & Array Manipulations", "questionCount": 20},
+                {"id": "top-java-3", "name": "OOP Principles, Inheritance & Interface Contracts", "questionCount": 20},
+                {"id": "top-java-4", "name": "Packages, Exception Handling & Wrapper Classes", "questionCount": 20},
+                {"id": "top-java-5", "name": "Multithreading, Sockets, JDBC & Web Basics", "questionCount": 20},
+            ]
+        },
+        {
+            "id": "cat-bca-networks",
+            "name": "Computer Networks (BCA-503)",
+            "questionCount": 100,
+            "topics": [
+                {"id": "top-cn-1", "name": "Network Topologies, Physical Media & OSI Reference Model", "questionCount": 20},
+                {"id": "top-cn-2", "name": "Data Link Layer, HDLC Framing & Error Control", "questionCount": 20},
+                {"id": "top-cn-3", "name": "MAC Protocols, CSMA/CD, CSMA/CA & Ethernet", "questionCount": 20},
+                {"id": "top-cn-4", "name": "Network Layer, IPv4/IPv6 Addressing & Routing Algorithms", "questionCount": 20},
+                {"id": "top-cn-5", "name": "Transport Layer (TCP/UDP), Security & Application Protocols", "questionCount": 20},
+            ]
+        },
+        {
+            "id": "cat-bca-numerical",
+            "name": "Numerical Methods (BCA-504)",
+            "questionCount": 100,
+            "topics": [
+                {"id": "top-nm-1", "name": "Errors, Approximations & Non-Linear Root Finding", "questionCount": 20},
+                {"id": "top-nm-2", "name": "Linear Systems, Gauss Elimination & Iterative Methods", "questionCount": 20},
+                {"id": "top-nm-3", "name": "Finite Differences Operators & Interpolation Formulas", "questionCount": 20},
+                {"id": "top-nm-4", "name": "Numerical Differentiation & Quadrature Rules", "questionCount": 20},
+                {"id": "top-nm-5", "name": "Ordinary Differential Equations (Euler, RK4 & Milne)", "questionCount": 20},
+            ]
+        },
+        {
+            "id": "cat-quant",
+            "name": "Quantitative Aptitude",
+            "questionCount": 35,
+            "topics": [
+                {"id": "top-quant-1", "name": "Data Interpretation & Graphs", "questionCount": 10},
+                {"id": "top-quant-2", "name": "Percentages & Profit Loss", "questionCount": 10},
+                {"id": "top-quant-3", "name": "Time, Speed, Distance & Work", "questionCount": 15},
+            ]
+        },
+        {
+            "id": "cat-reasoning",
+            "name": "Reasoning Ability",
+            "questionCount": 35,
+            "topics": [
+                {"id": "top-reas-1", "name": "Syllogism & Deductive Logic", "questionCount": 15},
+                {"id": "top-reas-2", "name": "Puzzles & Seating Arrangement", "questionCount": 20},
+            ]
+        },
+        {
+            "id": "cat-english",
+            "name": "English Language",
+            "questionCount": 25,
+            "topics": [
+                {"id": "top-eng-1", "name": "Reading Comprehension", "questionCount": 10},
+                {"id": "top-eng-2", "name": "Error Detection & Grammar", "questionCount": 15},
+            ]
+        },
+        {
+            "id": "cat-ga",
+            "name": "General Awareness",
+            "questionCount": 25,
+            "topics": [
+                {"id": "top-ga-1", "name": "Banking & Financial Awareness", "questionCount": 15},
+                {"id": "top-ga-2", "name": "Current Affairs & Static GK", "questionCount": 10},
+            ]
+        }
+    ]
+    db["practiceCategories"] = practice_cats
 
-    print("--- 2. Building BCA Tests & Test Suites ---")
-    # Retain non-BCA tests
+    print("--- 3. Defining BCA Tests with Clean Schema ---")
     non_bca_tests = [t for t in db.get("tests", []) if not ("bca" in t.get("id", "") or "bca" in str(t.get("examId", "")))]
     
-    # Define BCA Tests
-    bca_tests = [
-        # 1. Subject 100-Question Mastery Exams
+    bca_test_defs = [
+        # 1. 100-Question Mastery Sectional Exams
         {
             "id": "test-bca-dbms-100",
             "title": "BCA-501 DBMS: 100 Questions Complete Subject Exam",
@@ -75,7 +150,7 @@ def main():
             "examSlug": "bca-5th-sem",
             "subjectId": "sub-bca-501",
             "subjectName": "DBMS (BCA-501)",
-            "testType": "Subject Test",
+            "testType": "Sectional",
             "duration": 120,
             "totalMarks": 100,
             "negativeMarks": 0.25,
@@ -83,7 +158,7 @@ def main():
             "isPremium": False,
             "questionCount": 100,
             "attemptCount": 42,
-            "questionIds": [q["id"] for q in dbms_qs]
+            "_rawQIds": [q["id"] for q in dbms_qs]
         },
         {
             "id": "test-bca-java-100",
@@ -94,7 +169,7 @@ def main():
             "examSlug": "bca-5th-sem",
             "subjectId": "sub-bca-502",
             "subjectName": "Java & Webpage Design (BCA-502)",
-            "testType": "Subject Test",
+            "testType": "Sectional",
             "duration": 120,
             "totalMarks": 100,
             "negativeMarks": 0.25,
@@ -102,7 +177,7 @@ def main():
             "isPremium": False,
             "questionCount": 100,
             "attemptCount": 38,
-            "questionIds": [q["id"] for q in java_qs]
+            "_rawQIds": [q["id"] for q in java_qs]
         },
         {
             "id": "test-bca-cn-100",
@@ -113,7 +188,7 @@ def main():
             "examSlug": "bca-5th-sem",
             "subjectId": "sub-bca-503",
             "subjectName": "Computer Networks (BCA-503)",
-            "testType": "Subject Test",
+            "testType": "Sectional",
             "duration": 120,
             "totalMarks": 100,
             "negativeMarks": 0.25,
@@ -121,7 +196,7 @@ def main():
             "isPremium": False,
             "questionCount": 100,
             "attemptCount": 35,
-            "questionIds": [q["id"] for q in cn_qs]
+            "_rawQIds": [q["id"] for q in cn_qs]
         },
         {
             "id": "test-bca-nm-100",
@@ -132,7 +207,7 @@ def main():
             "examSlug": "bca-5th-sem",
             "subjectId": "sub-bca-504",
             "subjectName": "Numerical Methods (BCA-504)",
-            "testType": "Subject Test",
+            "testType": "Sectional",
             "duration": 120,
             "totalMarks": 100,
             "negativeMarks": 0.25,
@@ -140,7 +215,7 @@ def main():
             "isPremium": False,
             "questionCount": 100,
             "attemptCount": 29,
-            "questionIds": [q["id"] for q in nm_qs]
+            "_rawQIds": [q["id"] for q in nm_qs]
         },
 
         # 2. Grand Semester Full-Length Mock (100 Questions: 25 from each subject)
@@ -161,20 +236,20 @@ def main():
             "isPremium": False,
             "questionCount": 100,
             "attemptCount": 56,
-            "questionIds": [q["id"] for q in dbms_qs[:25]] + [q["id"] for q in java_qs[:25]] + [q["id"] for q in cn_qs[:25]] + [q["id"] for q in nm_qs[:25]]
+            "_rawQIds": [q["id"] for q in dbms_qs[:25]] + [q["id"] for q in java_qs[:25]] + [q["id"] for q in cn_qs[:25]] + [q["id"] for q in nm_qs[:25]]
         },
 
-        # 3. Backward Compatible Existing Test IDs (Updated with 25-50 fresh questions)
+        # 3. Practice Mock (40 Questions)
         {
             "id": "test-bca-full-01",
-            "title": "BCA 5th Sem: All Subjects Semester Mock",
-            "description": "Balanced 60-minute mock test covering DBMS, Java, Networks, and Numerical Methods.",
+            "title": "BCA 5th Sem: All Subjects Semester Practice Mock",
+            "description": "Balanced 60-minute practice mock test covering DBMS, Java, Networks, and Numerical Methods.",
             "examId": "bca-5th-sem-ccsu",
             "examName": "BCA 5th Semester",
             "examSlug": "bca-5th-sem",
             "subjectId": None,
             "subjectName": "Full Syllabus",
-            "testType": "Full Length",
+            "testType": "Practice",
             "duration": 60,
             "totalMarks": 50,
             "negativeMarks": 0.25,
@@ -182,8 +257,10 @@ def main():
             "isPremium": False,
             "questionCount": 40,
             "attemptCount": 18,
-            "questionIds": [q["id"] for q in dbms_qs[25:35]] + [q["id"] for q in java_qs[25:35]] + [q["id"] for q in cn_qs[25:35]] + [q["id"] for q in nm_qs[25:35]]
+            "_rawQIds": [q["id"] for q in dbms_qs[25:35]] + [q["id"] for q in java_qs[25:35]] + [q["id"] for q in cn_qs[25:35]] + [q["id"] for q in nm_qs[25:35]]
         },
+
+        # 4. 50-Question Sectional Practice Papers
         {
             "id": "test-bca-dbms-01",
             "title": "DBMS (BCA-501) Semester Mock Paper",
@@ -193,7 +270,7 @@ def main():
             "examSlug": "bca-5th-sem",
             "subjectId": "sub-bca-501",
             "subjectName": "DBMS (BCA-501)",
-            "testType": "Subject Test",
+            "testType": "Sectional",
             "duration": 60,
             "totalMarks": 50,
             "negativeMarks": 0.25,
@@ -201,7 +278,7 @@ def main():
             "isPremium": False,
             "questionCount": 50,
             "attemptCount": 24,
-            "questionIds": [q["id"] for q in dbms_qs[:50]]
+            "_rawQIds": [q["id"] for q in dbms_qs[:50]]
         },
         {
             "id": "test-bca-java-01",
@@ -212,7 +289,7 @@ def main():
             "examSlug": "bca-5th-sem",
             "subjectId": "sub-bca-502",
             "subjectName": "Java & Webpage Design (BCA-502)",
-            "testType": "Subject Test",
+            "testType": "Sectional",
             "duration": 60,
             "totalMarks": 50,
             "negativeMarks": 0.25,
@@ -220,7 +297,7 @@ def main():
             "isPremium": False,
             "questionCount": 50,
             "attemptCount": 21,
-            "questionIds": [q["id"] for q in java_qs[:50]]
+            "_rawQIds": [q["id"] for q in java_qs[:50]]
         },
         {
             "id": "test-bca-networks-01",
@@ -231,7 +308,7 @@ def main():
             "examSlug": "bca-5th-sem",
             "subjectId": "sub-bca-503",
             "subjectName": "Computer Networks (BCA-503)",
-            "testType": "Subject Test",
+            "testType": "Sectional",
             "duration": 60,
             "totalMarks": 50,
             "negativeMarks": 0.25,
@@ -239,7 +316,7 @@ def main():
             "isPremium": False,
             "questionCount": 50,
             "attemptCount": 19,
-            "questionIds": [q["id"] for q in cn_qs[:50]]
+            "_rawQIds": [q["id"] for q in cn_qs[:50]]
         },
         {
             "id": "test-bca-nm-01",
@@ -250,7 +327,7 @@ def main():
             "examSlug": "bca-5th-sem",
             "subjectId": "sub-bca-504",
             "subjectName": "Numerical Methods (BCA-504)",
-            "testType": "Subject Test",
+            "testType": "Sectional",
             "duration": 60,
             "totalMarks": 50,
             "negativeMarks": 0.25,
@@ -258,41 +335,48 @@ def main():
             "isPremium": False,
             "questionCount": 50,
             "attemptCount": 17,
-            "questionIds": [q["id"] for q in nm_qs[:50]]
+            "_rawQIds": [q["id"] for q in nm_qs[:50]]
         }
     ]
 
-    all_tests = non_bca_tests + bca_tests
-    db["tests"] = all_tests
-
-    # Build testsWithQuestions
-    tests_with_questions = []
-    # Build dictionary of non-BCA tests with questions
+    clean_tests = []
+    clean_twq = []
     old_twq_map = {t["id"]: t for t in db.get("testsWithQuestions", [])}
 
-    for t in all_tests:
+    # Clean existing non-bca tests
+    for t in non_bca_tests:
         tid = t["id"]
-        t_copy = dict(t)
-        if "questionIds" in t:
-            t_qs = [q_map[qid] for qid in t["questionIds"] if qid in q_map]
-            t_copy["questions"] = t_qs
-            t_copy["questionCount"] = len(t_qs)
-            # Remove questionIds from top-level metadata if desired, or keep it
-        elif tid in old_twq_map:
-            t_copy["questions"] = old_twq_map[tid].get("questions", [])
-            t_copy["questionCount"] = len(t_copy["questions"])
-        else:
-            t_copy["questions"] = []
-            t_copy["questionCount"] = 0
-        tests_with_questions.append(t_copy)
+        t_clean = {k: v for k, v in t.items() if k != "questionIds" and k != "questions"}
+        clean_tests.append(t_clean)
 
-    db["testsWithQuestions"] = tests_with_questions
+        twq_item = dict(t_clean)
+        if tid in old_twq_map:
+            twq_item["questions"] = old_twq_map[tid].get("questions", [])
+        else:
+            twq_item["questions"] = []
+        twq_item["questionCount"] = len(twq_item["questions"])
+        clean_twq.append(twq_item)
+
+    # Clean and attach BCA tests
+    for t in bca_test_defs:
+        raw_ids = t.pop("_rawQIds", [])
+        t_clean = {k: v for k, v in t.items() if k != "questionIds" and k != "questions"}
+        clean_tests.append(t_clean)
+
+        twq_item = dict(t_clean)
+        t_qs = [q_map[qid] for qid in raw_ids if qid in q_map]
+        twq_item["questions"] = t_qs
+        twq_item["questionCount"] = len(t_qs)
+        clean_twq.append(twq_item)
+
+    db["tests"] = clean_tests
+    db["testsWithQuestions"] = clean_twq
 
     with open(db_path, "w", encoding="utf-8") as f:
         json.dump(db, f, indent=2, ensure_ascii=False)
 
-    print(f"Successfully saved {len(db['questions'])} total questions ({len(all_bca_qs)} BCA) into {db_path}!")
-    print(f"Successfully configured {len(db['tests'])} tests ({len(bca_tests)} BCA tests)!")
+    print(f"Successfully saved {len(db['questions'])} total questions into {db_path}!")
+    print(f"Successfully configured {len(db['tests'])} tests ({len(bca_test_defs)} BCA tests) with 0 leaked questionIds!")
 
 if __name__ == "__main__":
     main()

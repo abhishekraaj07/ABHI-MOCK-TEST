@@ -251,12 +251,12 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
 
         setUserAnswers(answersMap);
         setBookmarkedSet(bSet);
+        const durationMins = Number(normalizedAttempt.durationMinutes ?? normalizedAttempt.duration ?? 60);
         const totalDuration = Number(
-          normalizedAttempt.totalDurationSeconds ??
-          (normalizedAttempt.durationMinutes ? normalizedAttempt.durationMinutes * 60 : 3600)
+          normalizedAttempt.totalDurationSeconds ?? (durationMins * 60)
         );
         const remSec = Number(normalizedAttempt.remainingSeconds ?? totalDuration);
-        setRemainingTime(isNaN(remSec) || remSec < 0 ? 3600 : remSec);
+        setRemainingTime(isNaN(remSec) || remSec < 0 ? totalDuration : remSec);
         setLoading(false);
       } catch (err: any) {
         setErrorMessage(err.message || 'Error connecting to test server.');

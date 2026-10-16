@@ -87,8 +87,8 @@ const EXAMS = [
       'Computer Networks (BCA-503)',
       'Numerical Methods (BCA-504)',
     ],
-    testCount: 5,
-    questionCount: 20,
+    testCount: 10,
+    questionCount: 400,
   },
 ];
 
@@ -311,7 +311,16 @@ export async function onRequest(context: any): Promise<Response> {
     };
 
     matchingTests.forEach((t: any) => {
-      const typeKey = t.testType in grouped ? t.testType : 'Full Length';
+      let typeKey = 'Full Length';
+      if (t.testType === 'Sectional' || t.testType === 'Subject Test') {
+        typeKey = 'Sectional';
+      } else if (t.testType === 'Practice') {
+        typeKey = 'Practice';
+      } else if (t.testType === 'Previous Year' || t.testType === 'PYQ') {
+        typeKey = 'Previous Year';
+      } else if (t.testType in grouped) {
+        typeKey = t.testType;
+      }
       grouped[typeKey].push({
         id: t.id,
         title: t.title,
@@ -328,12 +337,24 @@ export async function onRequest(context: any): Promise<Response> {
       });
     });
 
-    const subjects = (exam.subjects || []).map((subName: string, idx: number) => ({
-      id: `sub-${idx + 1}`,
-      name: subName,
-      questionCount: 20,
-      topics: ['Concept Drills', 'Previous Year Questions', 'Mock Practice'],
-    }));
+    const subjects = (exam.subjects || []).map((subName: string, idx: number) => {
+      const qCount = (dbData.questions || []).filter((q: any) => {
+        if (!q.subjectName && !q.subject?.name) return false;
+        const s = (q.subjectName || q.subject?.name || '').toLowerCase();
+        const target = subName.toLowerCase();
+        return s.includes(target) || target.includes(s) ||
+          (target.includes('dbms') && s.includes('dbms')) ||
+          (target.includes('java') && s.includes('java')) ||
+          (target.includes('network') && s.includes('network')) ||
+          (target.includes('numerical') && s.includes('numerical'));
+      }).length;
+      return {
+        id: `sub-${idx + 1}`,
+        name: subName,
+        questionCount: qCount > 0 ? qCount : 20,
+        topics: ['Concept Drills', 'Previous Year Questions', 'Mock Practice'],
+      };
+    });
 
     return json({
       exam: {
@@ -355,7 +376,7 @@ export async function onRequest(context: any): Promise<Response> {
     let list = [...(dbData.tests || [])];
     const tab = url.searchParams.get('tab');
     if (tab === 'Full Tests') list = list.filter((t) => t.testType === 'Full Length');
-    else if (tab === 'Sectional') list = list.filter((t) => t.testType === 'Sectional');
+    else if (tab === 'Sectional') list = list.filter((t) => t.testType === 'Sectional' || t.testType === 'Subject Test');
     else if (tab === 'Free') list = list.filter((t) => !t.isPremium);
     else if (tab === 'Premium') list = list.filter((t) => t.isPremium);
     else if (tab === 'Practice') list = list.filter((t) => t.testType === 'Practice');
@@ -451,14 +472,15 @@ export async function onRequest(context: any): Promise<Response> {
     if (matching.length === 0) {
       matching = (dbData.questions || []).slice(0, 10);
     }
+    const topicName = matching[0]?.topicName || matching[0]?.topic?.name || 'Practice Drill';
     return json({
-      topic: { id: topicId, name: matching[0]?.topic?.name || 'Practice Drill' },
+      topic: { id: topicId, name: topicName },
       questions: matching.map((q: any, idx: number) => ({
         id: q.id,
         order: idx + 1,
         questionText: q.questionText,
         difficulty: q.difficulty,
-        subjectName: q.subject?.name,
+        subjectName: q.subjectName || q.subject?.name || 'General',
         explanation: q.explanation,
         options: q.options,
       })),
@@ -554,8 +576,8 @@ export async function onRequest(context: any): Promise<Response> {
         isCorrect,
         explanation: q.explanation,
         shortcut: q.shortcut,
-        subjectName: q.subject?.name,
-        topicName: q.topic?.name,
+        subjectName: q.subjectName || q.subject?.name || 'General',
+        topicName: q.topicName || q.topic?.name || 'General',
       };
     });
 

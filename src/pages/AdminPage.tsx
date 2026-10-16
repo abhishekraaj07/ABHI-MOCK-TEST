@@ -542,8 +542,8 @@ export const AdminPage: React.FC = () => {
                     <tr key={q.id} className="hover:bg-[var(--paper)] transition-colors">
                       <td className="py-3.5 px-4 font-medium max-w-md">{q.questionText}</td>
                       <td className="py-3.5 px-4 font-mono opacity-80">
-                        <div>{q.subject?.name}</div>
-                        <div className="text-[10px] opacity-60">{q.topic?.name}</div>
+                        <div>{q.subjectName || q.subject?.name || 'General'}</div>
+                        <div className="text-[10px] opacity-60">{q.topicName || q.topic?.name || 'General'}</div>
                       </td>
                       <td className="py-3.5 px-4 font-mono">
                         +{q.marks} / -{q.negativeMarks}

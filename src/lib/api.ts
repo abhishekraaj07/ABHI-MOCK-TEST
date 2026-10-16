@@ -82,13 +82,13 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
         matching = FALLBACK_QUESTIONS.slice(0, 10);
       }
       return jsonResponse({
-        topic: { id: topicId, name: matching[0]?.topic?.name || 'Practice Drill' },
+        topic: { id: topicId, name: matching[0]?.topicName || matching[0]?.topic?.name || 'Practice Drill' },
         questions: matching.map((q, idx) => ({
           id: q.id,
           order: idx + 1,
           questionText: q.questionText,
           difficulty: q.difficulty,
-          subjectName: q.subject?.name,
+          subjectName: q.subjectName || q.subject?.name || 'General',
           explanation: q.explanation,
           options: q.options,
         })),
@@ -185,8 +185,8 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
           negativeMarks: q.negativeMarks || 0.25,
           explanation: q.explanation || 'Detailed concept revision required.',
           shortcut: q.shortcut || null,
-          subjectName: q.subject?.name || 'General',
-          topicName: q.topic?.name || 'High Yield Topics',
+          subjectName: q.subjectName || q.subject?.name || 'General',
+          topicName: q.topicName || q.topic?.name || 'High Yield Topics',
           examName: 'SBI PO / SSC CGL',
           correctOptionKey: correctOpt?.optionKey || 'A',
           correctOptionText: correctOpt?.optionText || '',
