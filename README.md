@@ -2,7 +2,7 @@
 
 # ⚡ ABHI MOCK TEST
 
-### **Next-Gen Competitive Exam Engine & AI-Powered Aspirant Diagnostic Platform**
+### **Next-Gen University Degree & Competitive Exam Engine & AI Diagnostic Platform**
 
 *Engineered with NTA / TCS-iON simulation fidelity, real-time response persistence, adaptive error analytics, and Google Gemini AI tutoring.*
 
@@ -11,12 +11,8 @@
 [![Cloudflare Pages](https://img.shields.io/badge/Live%20Demo-Cloudflare%20Pages-F38020?logo=cloudflare&logoColor=white)](https://abhi-mock-test.pages.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19.0-61DAFB?logo=react&logoColor=black)](https://react.dev/)
-[![Express.js](https://img.shields.io/badge/Express.js-4.21-lightgrey?logo=express&logoColor=black)](https://expressjs.com/)
-[![Prisma ORM](https://img.shields.io/badge/Prisma-6.4-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io/)
-[![SQLite](https://img.shields.io/badge/SQLite-Database-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
-[![Google Gemini API](https://img.shields.io/badge/Google%20Gemini-2.4%20SDK-8E75B2?logo=google&logoColor=white)](https://ai.google.dev/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38B2AC?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![Tests Passing](https://img.shields.io/badge/Tests-36%2F36%20Passing-brightgreen?logo=checkmarx&logoColor=white)]()
+[![BCA CCSU](https://img.shields.io/badge/BCA%205th%20Sem-400%20Questions%20Live-success?logo=bookstack&logoColor=white)](https://abhi-mock-test.pages.dev/exams/bca-5th-sem)
+[![Tests Passing](https://img.shields.io/badge/Tests-41%2F41%20Passing-brightgreen?logo=checkmarx&logoColor=white)]()
 [![Code Quality](https://img.shields.io/badge/TypeCheck-0%20Errors-emerald)]()
 [![Security](https://img.shields.io/badge/Security-Hardened-blueviolet?logo=shield&logoColor=white)]()
 
@@ -28,12 +24,12 @@
 
 ## 🌟 Overview
 
-**ABHI MOCK TEST** is a full-stack, enterprise-grade mock test engine designed for candidates preparing for top national competitive examinations (such as **SBI PO, SSC CGL, RRB NTPC, UPSC Prelims, and JEE Main**).
+**ABHI MOCK TEST** is a full-stack, enterprise-grade mock test platform designed for university students and competitive exam aspirants. It features comprehensive coverage for **BCA 5th Semester (Chaudhary Charan Singh University - CCSU)** with 400 syllabus-accurate questions and 10 mock exams, alongside major competitive examination frameworks (**SBI PO, SBI Clerk, IBPS PO, SSC CGL, RRB PO, and RBI Grade B**).
 
 Unlike static mock test portals, ABHI MOCK TEST mirrors the rigorous behavioral conditions of genuine exam environments:
 - Distraction-free, full-screen examination canvas
 - Official 5-state question palette
-- Authoritative server-synchronized countdown timer
+- Authoritative server-synchronized countdown timer (supporting 120-minute master exams)
 - Resilient auto-save engine with offline local drafting (`localStorage`)
 - Interactive **Mistake Notebook** with flashcard retention drills
 - **Daily 5-minute Sprint Quizzes** to maintain learning streaks
@@ -91,6 +87,15 @@ Unlike static mock test portals, ABHI MOCK TEST mirrors the rigorous behavioral 
 - **Academic Dispute Resolution:** Review, verify, and resolve or reject user-submitted question discrepancy reports.
 - Comprehensive platform analytics: candidate cohorts, test attempt histories, and syllabus management.
 
+### 🎓 9. BCA 5th Semester (CCSU) Master Suite (400 Questions)
+- **Official University Syllabus Coverage:** Fully aligned with Chaudhary Charan Singh University (CCSU) examination curriculum across 4 core subjects (100 curated questions each):
+  - **BCA-501 DBMS:** ANSI-SPARC 3-tier architecture, Relational Algebra, 1NF to 5NF normalization, ACID transaction models, B+ trees, and ARIES recovery protocols.
+  - **BCA-502 Java & Webpage Design:** JVM architecture, bytecode verification, OOP inheritance, interface contracts, checked/unchecked exceptions, multithreading, synchronization, applet lifecycle, and JDBC connectivity.
+  - **BCA-503 Computer Networks:** OSI & TCP/IP reference stacks, HDLC framing, bit stuffing, sliding window ARQ, CRC & Hamming codes, CSMA/CD, IPv4/IPv6 subnetting, and Dijkstra/Bellman-Ford routing.
+  - **BCA-504 Numerical Methods:** Error propagation, Bisection, Regula Falsi, Newton-Raphson, Gauss Elimination & Gauss-Seidel, Newton/Lagrange interpolation, and 4th-order Runge-Kutta (RK4).
+- **10 Dedicated BCA Mock Tests:** Four 100-question master subject tests, four 50-question semester mock papers, a 100-question Grand Semester Final (25 balanced questions per subject), and a 40-question practice mock.
+- **20 Targeted Topic Practice Drills:** 5 syllabus topics per subject with 20 questions each, enabling focused revision on specific conceptual weak points.
+
 ---
 
 ## 📐 Scoring Formula & Mathematical Model
@@ -113,7 +118,7 @@ $$\text{Percentage} = \begin{cases} \left(\dfrac{\text{Final Score}}{\text{Total
 ```
 ABHI-MOCK-TEST/
 ├── prisma/
-│   ├── dev.db                 # SQLite database (120 questions, 26 tests, 6 exams)
+│   ├── dev.db                 # SQLite database & dbData.json (520 questions, 36 tests, 7 exams)
 │   ├── schema.prisma          # Database schema (Models, Relations, Indexes)
 │   └── seed.ts                # Database seeder with complete syllabus bank
 ├── server/
@@ -182,7 +187,7 @@ ABHI-MOCK-TEST/
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/abhishekishere014-git/ABHI-MOCK-TEST.git
+git clone https://github.com/abhishekraaj07/ABHI-MOCK-TEST.git
 cd ABHI-MOCK-TEST
 ```
 
@@ -221,25 +226,22 @@ Open your browser and navigate to: **`http://localhost:3000`**
 
 ## 🧪 Automated Testing & Quality Verification
 
-Run the test suite using Node.js native test runner and `tsx`:
+Run the test suite using Node.js native test runner:
 
 ```bash
-# Execute all automated test suites
-npx tsx --test tests/scoring.test.ts tests/features.test.ts tests/leaderboard.test.ts
-```
-
-```bash
-npm test
+npm test -- --run
 ```
 
 Output:
 ```
+✔ Production-Hardening: Input Validation & Audit Tests (3 tests passed)
 ✔ Authentication & Authorization Security Tests (5 tests passed)
 ✔ Exam Integrity & Anti-Tampering Security Tests (4 tests passed)
-✔ Features & Business Logic Unit Tests (4 tests passed)
+✔ Features & Business Logic Unit Tests (6 tests passed)
+✔ Guest Mode Authentication & Access Control Tests (3 tests passed)
 ✔ Leaderboard Calculation & Ranking Logic Unit Tests (2 tests passed)
-✔ Scoring Engine Unit Tests (6 tests passed)
-Total: 24 / 24 Passed (0 Failed)
+✔ Scoring Engine Unit Tests (7 tests passed)
+Total: 41 / 41 Passed (0 Failed across 7 test suites)
 ```
 
 Verify strict TypeScript compilation:
@@ -341,5 +343,5 @@ Distributed under the **MIT License**. See `LICENSE` for more information.
 ---
 
 <div align="center">
-Built with ❤️ for serious aspirants by <a href="https://github.com/abhishekishere014-git">Abhishek Sharma</a>.
+Built with ❤️ for university and competitive exam aspirants by <a href="https://github.com/abhishekraaj07">Abhishek Sharma</a>.
 </div>

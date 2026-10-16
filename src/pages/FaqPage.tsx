@@ -37,13 +37,25 @@ const FAQ_DATA: FaqItem[] = [
     category: 'Question Types & Exams',
     question: 'What types of questions are available on ABHI MOCK TEST?',
     answer:
-      'The platform supports Single-Choice Multiple Choice Questions (MCQs), Multiple-Choice MCQs, True/False format questions, and Numerical Answer types (where the candidate directly enters a calculated numeric result).',
+      'The platform supports Single-Choice Multiple Choice Questions (MCQs), Multiple-Choice MCQs, True/False format questions, and Numerical Answer types (where the candidate directly enters a calculated numeric result). All questions are curated strictly against current syllabus patterns.',
   },
   {
     category: 'Question Types & Exams',
-    question: 'Which competitive exams are covered?',
+    question: 'Which university degrees and competitive exams are covered?',
     answer:
-      'We offer specialized mock tests for Banking (SBI PO, SBI Clerk, IBPS PO, IBPS Clerk, RRB Officer), Staff Selection (SSC CGL Tier 1 & Tier 2), and Regulatory Bodies (RBI Grade B). Tests include both full-length multi-section simulations and single-subject sectional drills.',
+      'We offer specialized mock tests for University Degree Programs — specifically BCA 5th Semester (CCSU) featuring 400 curated questions across DBMS, Java, Computer Networks, and Numerical Methods — as well as leading competitive exams including Banking (SBI PO, SBI Clerk, IBPS PO, RRB Officer), Staff Selection (SSC CGL), and Regulatory Bodies (RBI Grade B).',
+  },
+  {
+    category: 'Question Types & Exams',
+    question: 'How is the BCA 5th Semester (CCSU) test series structured?',
+    answer:
+      'The BCA series provides 10 full-scale mock tests comprising 400 syllabus-accurate questions: four 100-question master subject tests (BCA-501 DBMS, BCA-502 Java & Webpage Design, BCA-503 Computer Networks, and BCA-504 Numerical Methods), four 50-question semester mock papers, a 100-question Grand Semester Final covering all 4 subjects, and a 40-question practice mock.',
+  },
+  {
+    category: 'Question Types & Exams',
+    question: 'Are topic-wise practice drills available for BCA subjects?',
+    answer:
+      'Yes! Under the Practice section, students can drill down into 20 syllabus topics (5 topics per subject with 20 targeted questions each), covering critical areas like ANSI-SPARC 3-tier architecture, B+ trees, Normalization, Multithreading & Synchronization, OSI & TCP/IP framing, CRC error detection, Newton-Raphson, and RK4 numerical methods.',
   },
   {
     category: 'Analytics & Performance',
