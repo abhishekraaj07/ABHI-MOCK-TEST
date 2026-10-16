@@ -6,7 +6,7 @@ import { PaletteLegend } from '../components/PaletteLegend';
 import { Clock, CheckCircle2, Shield, BarChart3, ArrowRight, ChevronRight, ChevronLeft } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { FALLBACK_EXAMS, FALLBACK_STATS } from '../lib/fallbackData';
-import { SBI_PO_QUANT_35_QUESTIONS } from '../data/sbiPoQuantDemoQuestions';
+import { BCA_DEMO_25_QUESTIONS } from '../data/bcaDemoQuestions';
 
 export const LandingPage: React.FC = () => {
   const [exams, setExams] = useState<Exam[]>(FALLBACK_EXAMS);
@@ -19,35 +19,33 @@ export const LandingPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   // Demo interactive widget state in Hero section (§4)
-  // Starts directly on Question 16 (index 15) so candidate immediately sees Question 16 of 35
-  const [demoIndex, setDemoIndex] = useState<number>(15);
+  // Starts directly on Question 11 (index 10) so candidate immediately sees Question 11 of 25
+  const [demoIndex, setDemoIndex] = useState<number>(10);
 
-  // Pre-fill realistic candidate answers for prior questions (1 to 15)
+  // Pre-fill realistic candidate answers for prior questions (1 to 10)
   const [demoAnswers, setDemoAnswers] = useState<Record<number, string>>({
     0: 'A',
-    1: 'A',
+    1: 'B',
     2: 'A',
     3: 'A',
-    4: 'A',
+    4: 'C',
     5: 'A',
     6: 'A',
-    7: 'A',
+    7: 'B',
     8: 'A',
     9: 'A',
-    11: 'A',
-    13: 'B',
   });
 
   // Track review flags by question index
   const [demoReview, setDemoReview] = useState<Record<number, boolean>>({
-    10: true, // Q11 marked for review
-    11: true, // Q12 answered & marked for review
+    6: true, // Q7 marked for review
+    7: true, // Q8 answered & marked for review
   });
 
   // Track visited status by question index
   const [demoVisited, setDemoVisited] = useState<Record<number, boolean>>(() => {
     const init: Record<number, boolean> = {};
-    for (let i = 0; i <= 15; i++) {
+    for (let i = 0; i <= 10; i++) {
       init[i] = true;
     }
     return init;
@@ -55,7 +53,7 @@ export const LandingPage: React.FC = () => {
 
   const [demoTimer, setDemoTimer] = useState<number>(19 * 60 + 42); // 19m 42s Sectional Timer
 
-  const totalQuestions = SBI_PO_QUANT_35_QUESTIONS.length; // 35
+  const totalQuestions = BCA_DEMO_25_QUESTIONS.length; // 25
   const answeredCount = Object.keys(demoAnswers).length;
   const reviewCount = Object.values(demoReview).filter(Boolean).length;
   const visitedCount = Object.values(demoVisited).filter(Boolean).length;
@@ -171,24 +169,24 @@ export const LandingPage: React.FC = () => {
             <div className="lg:col-span-7 space-y-6">
               <div className="inline-flex items-center gap-2 rounded border border-[var(--line)] bg-[var(--paper)] px-3 py-1 text-xs font-semibold text-[var(--accent)]">
                 <span className="h-2 w-2 rounded-full bg-[var(--signal-correct)] animate-pulse" />
-                2026 Competitive Exam Series Live
+                2026 University & Competitive Series Live
               </div>
 
               <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-medium tracking-tight text-[var(--ink)] leading-[1.15]">
-                Crack Competitive Exams With Smarter Practice
+                Crack Competitive & University Exams With Smarter Practice
               </h1>
 
               <p className="text-base sm:text-lg text-[var(--ink)] opacity-80 leading-relaxed max-w-2xl font-sans">
-                Full-fidelity test simulations, server-authoritative countdown timers, and strict negative-marking analytics engineered for serious SBI, IBPS, SSC, and RBI aspirants.
+                Full-fidelity test simulations, server-authoritative countdown timers, and detailed analytics engineered for BCA Semester Exams and All Competitive Aspirants.
               </p>
 
               <div className="flex flex-wrap items-center gap-4 pt-2">
                 <Link
-                  href="/mock-tests?tab=Free"
+                  href="/exams/bca-5th-sem"
                   id="hero-cta-free-test"
                   className="rounded bg-[var(--accent)] px-6 py-3 text-sm font-semibold text-white hover:bg-[var(--accent-hover)] transition-colors shadow-sm"
                 >
-                  Start Free Mock Test
+                  Start BCA 5th Sem Mock
                 </Link>
 
                 <Link
@@ -219,10 +217,10 @@ export const LandingPage: React.FC = () => {
                 <div className="flex items-center justify-between border-b border-[var(--line)] pb-3 text-xs">
                   <div>
                     <div className="font-semibold text-[var(--ink)]">
-                      SBI PO Prelims — Section 1: Quantitative
+                      BCA 5th Semester — All Subjects Practice Mock
                     </div>
                     <div className="text-[10px] text-[var(--ink)] opacity-60">
-                      Sectional Time: 20 Minutes • 35 Questions
+                      Semester Practice • 25 Curated Questions (DBMS, Java, Networks, Numerical)
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 rounded bg-[var(--surface)] px-2.5 py-1 font-mono font-bold text-[var(--accent)] border border-[var(--line)]">
@@ -233,7 +231,7 @@ export const LandingPage: React.FC = () => {
 
                 {/* Simulated Question Card */}
                 {(() => {
-                  const currentQ = SBI_PO_QUANT_35_QUESTIONS[demoIndex];
+                  const currentQ = BCA_DEMO_25_QUESTIONS[demoIndex];
                   const currentAnswer = demoAnswers[demoIndex];
                   const isReviewed = !!demoReview[demoIndex];
 
@@ -362,8 +360,8 @@ export const LandingPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-7 gap-1 text-center text-xs font-mono max-h-36 overflow-y-auto pr-0.5">
-                    {SBI_PO_QUANT_35_QUESTIONS.map((item, idx) => {
+                  <div className="grid grid-cols-5 gap-1.5 text-center text-xs font-mono max-h-36 overflow-y-auto pr-0.5">
+                    {BCA_DEMO_25_QUESTIONS.map((item, idx) => {
                       const stat = getQuestionStatus(idx);
                       const isCurrent = demoIndex === idx;
 
@@ -398,14 +396,14 @@ export const LandingPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Direct CTA to Launch SBI PO Prelims Test */}
+                {/* Direct CTA to Launch BCA 5th Sem Test */}
                 <div className="border-t border-[var(--line)] pt-3 flex items-center justify-between text-xs">
                   <span className="text-[11px] opacity-75">Ready for the real timed test?</span>
                   <Link
-                    href="/test/b55bf26f-0f32-4fcb-b411-ad012aad0a64/instructions"
+                    href="/test/test-bca-full-01/instructions"
                     className="inline-flex items-center gap-1 font-bold text-[var(--accent)] hover:underline"
                   >
-                    <span>Launch SBI PO Mock</span>
+                    <span>Launch BCA 5th Sem Mock</span>
                     <ArrowRight size={13} />
                   </Link>
                 </div>
@@ -604,7 +602,7 @@ export const LandingPage: React.FC = () => {
               {
                 step: '01',
                 title: 'Choose Exam',
-                desc: 'Select from SBI PO, IBPS, SSC CGL, or RBI Grade B with sectional or full-length formats.',
+                desc: 'Select from BCA 5th Sem, University degree courses, or competitive mock test formats.',
               },
               {
                 step: '02',

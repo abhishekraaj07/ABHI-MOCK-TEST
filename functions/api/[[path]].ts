@@ -9,6 +9,22 @@ const dbData = dbDataRaw as {
 
 const EXAMS = [
   {
+    id: 'bca-5th-sem-ccsu',
+    name: 'BCA 5th Semester (CCSU)',
+    slug: 'bca-5th-sem',
+    category: 'University Degree',
+    difficulty: 'Moderate',
+    description: 'Chaudhary Charan Singh University (CCSU) BCA 5th Semester comprehensive examination coverage with solved PYQs, subject drills, and semester practice tests.',
+    subjects: [
+      'DBMS (BCA-501)',
+      'Java & Webpage Design (BCA-502)',
+      'Computer Networks (BCA-503)',
+      'Numerical Methods (BCA-504)',
+    ],
+    testCount: 10,
+    questionCount: 400,
+  },
+  {
     id: 'sbi-po-default',
     name: 'SBI PO',
     slug: 'sbi-po',
@@ -73,22 +89,6 @@ const EXAMS = [
     subjects: ['Quantitative Aptitude', 'Reasoning Ability', 'English Language', 'General Awareness'],
     testCount: 1,
     questionCount: 20,
-  },
-  {
-    id: 'bca-5th-sem-ccsu',
-    name: 'BCA 5th Semester (CCSU)',
-    slug: 'bca-5th-sem',
-    category: 'University Degree',
-    difficulty: 'Moderate',
-    description: 'Chaudhary Charan Singh University (CCSU) BCA 5th Semester comprehensive examination coverage with solved PYQs, subject drills, and semester practice tests.',
-    subjects: [
-      'DBMS (BCA-501)',
-      'Java & Webpage Design (BCA-502)',
-      'Computer Networks (BCA-503)',
-      'Numerical Methods (BCA-504)',
-    ],
-    testCount: 10,
-    questionCount: 400,
   },
 ];
 
