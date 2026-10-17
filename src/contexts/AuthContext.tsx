@@ -7,10 +7,12 @@ import {
   syncUserToFirestore,
   isFirebaseConfigured,
 } from '../lib/firebase';
+import { logger } from '../lib/logger';
 import {
   signInWithPopup,
   signOut as firebaseSignOut,
   User as FirebaseUser,
+  GoogleAuthProvider,
 } from 'firebase/auth';
 
 interface AuthContextType {
@@ -68,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
       } catch (err) {
-        console.warn('Session check notice:', err);
+        logger.warn('Session check notice:', err);
       } finally {
         // Clean up any legacy localStorage tokens for security (§Phase 2 & 22)
         try {
@@ -105,8 +107,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       return { success: true };
-    } catch (err: any) {
-      return { success: false, error: err.message || 'Network error' };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Network error';
+      return { success: false, error: message };
     }
   };
 
@@ -134,8 +137,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       return { success: true };
-    } catch (err: any) {
-      return { success: false, error: err.message || 'Network error' };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Network error';
+      return { success: false, error: message };
     }
   };
 
@@ -166,7 +170,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
       syncUserState(fallbackGuest);
       return { success: true };
-    } catch (err: any) {
+    } catch (_err: unknown) {
       const fallbackGuest: User = {
         id: `guest_${Date.now()}`,
         name: 'Guest Aspirant',
@@ -191,8 +195,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const result = await signInWithPopup(auth, googleProvider);
       const fbUser: FirebaseUser = result.user;
 
-      // Obtain verified cryptographically signed ID token from Firebase
-      const idToken = await fbUser.getIdToken();
+      // Extract Google OAuth credential or Firebase ID token
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      const googleIdToken = credential?.idToken;
+      const firebaseIdToken = await fbUser.getIdToken();
+      const tokenToSend = googleIdToken || firebaseIdToken;
 
       // Sync with server session & Prisma database via server-verified token (§Phase 2)
       const res = await fetch('/api/auth/firebase-sync', {
@@ -200,7 +207,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          idToken,
+          idToken: tokenToSend,
           email: fbUser.email,
           name: fbUser.displayName,
           photoURL: fbUser.photoURL,
@@ -227,15 +234,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       return { success: true };
-    } catch (error: any) {
-      console.error('Google sign-in error:', error);
-      if (error.code === 'auth/popup-closed-by-user') {
+    } catch (error: unknown) {
+      logger.error('Google sign-in error:', error);
+      const fbError = error as { code?: string; message?: string } | null;
+      if (fbError?.code === 'auth/popup-closed-by-user') {
         return { success: false, error: 'Sign-in popup was closed before completing.' };
       }
-      if (error.code === 'auth/popup-blocked') {
+      if (fbError?.code === 'auth/popup-blocked') {
         return { success: false, error: 'Popup was blocked by your browser. Please allow popups for Google Sign-In.' };
       }
-      return { success: false, error: error.message || 'Google Sign-In failed. Please try again.' };
+      if (fbError?.code === 'auth/unauthorized-domain') {
+        return { success: false, error: 'This domain/port is not authorized in Firebase Console -> Authentication -> Settings -> Authorized Domains.' };
+      }
+      if (fbError?.code === 'auth/invalid-api-key' || fbError?.code === 'auth/configuration-not-found') {
+        return { success: false, error: 'Invalid Firebase configuration. Please check your Firebase API key in .env or use Email/Guest Login.' };
+      }
+      const message = error instanceof Error ? error.message : fbError?.message || 'Google Sign-In failed. Please try again.';
+      return { success: false, error: message };
     }
   };
 

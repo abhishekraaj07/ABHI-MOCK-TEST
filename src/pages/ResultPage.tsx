@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, Link } from '../contexts/RouterContext';
-import { ResultData, QuestionReviewItem } from '../types';
+import { ResultData, QuestionReviewItem, SubjectAnalysisItem } from '../types';
+
+interface RawResultResponse {
+  result?: ResultData['result'] & { result?: ResultData['result']; subjectAnalysis?: SubjectAnalysisItem[]; questions?: QuestionReviewItem[] };
+  subjectAnalysis?: SubjectAnalysisItem[];
+  questions?: QuestionReviewItem[];
+}
 import {
   Award,
   Clock,
@@ -23,6 +29,7 @@ import {
 import { QuestionReportModal } from '../components/QuestionReportModal';
 import { useAuth } from '../contexts/AuthContext';
 import { persistAttemptToFirestore } from '../lib/firebase';
+import { logger } from '../lib/logger';
 import {
   BarChart,
   Bar,
@@ -49,12 +56,12 @@ export const ResultPage: React.FC<{ attemptId: string }> = ({ attemptId }) => {
   const [displayedScore, setDisplayedScore] = useState<number>(0);
 
   useEffect(() => {
-    let timer: any = null;
+    let timer: ReturnType<typeof setInterval> | null = null;
     let isMounted = true;
 
     async function loadResult() {
       try {
-        let json: ResultData | null = null;
+        let json: RawResultResponse | null = null;
 
         // 1. Check local saved results first (has candidate's actual responses)
         try {
@@ -88,14 +95,13 @@ export const ResultPage: React.FC<{ attemptId: string }> = ({ attemptId }) => {
 
         if (json && isMounted) {
           // Normalize if double nested: json.result.result
-          let normalized: any = json;
-          if (json.result && json.result.result) {
-            normalized = {
-              result: json.result.result,
-              subjectAnalysis: json.subjectAnalysis || json.result.subjectAnalysis || [],
-              questions: json.questions || json.result.questions || [],
-            };
-          }
+          let normalized: ResultData = (json.result && json.result.result)
+            ? {
+                result: json.result.result,
+                subjectAnalysis: json.subjectAnalysis || json.result.subjectAnalysis || [],
+                questions: json.questions || json.result.questions || [],
+              }
+            : (json as unknown as ResultData);
 
           if (normalized.result) {
             normalized.result.score = typeof normalized.result.score === 'number' && !isNaN(normalized.result.score) ? normalized.result.score : 0;
@@ -154,7 +160,7 @@ export const ResultPage: React.FC<{ attemptId: string }> = ({ attemptId }) => {
           }, stepTime);
         }
       } catch (err) {
-        console.error('Failed to load result:', err);
+        logger.error('Failed to load result:', err);
         try {
           const fallback = (await import('../lib/fallbackData')).getFallbackTestResult(attemptId);
           if (fallback && isMounted) {
@@ -212,7 +218,7 @@ export const ResultPage: React.FC<{ attemptId: string }> = ({ attemptId }) => {
         });
       }
     } catch (e) {
-      console.error(e);
+      logger.error(e);
     }
   };
 

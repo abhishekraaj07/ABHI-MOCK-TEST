@@ -20,6 +20,7 @@ import {
 import { apiFetch } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { QuestionReportModal } from '../components/QuestionReportModal';
+import { logger } from '../lib/logger';
 
 interface WrongQuestion {
   questionId: string;
@@ -95,26 +96,26 @@ export const WrongQuestionsPage: React.FC = () => {
 
         // Merge locally captured wrong questions from test engine
         try {
-          const localWrongs = JSON.parse(localStorage.getItem('abhi_wrong_questions') || '[]');
+          const localWrongs: WrongQuestion[] = JSON.parse(localStorage.getItem('abhi_wrong_questions') || '[]');
           if (Array.isArray(localWrongs) && localWrongs.length > 0) {
-            const localIds = new Set(localWrongs.map((w: any) => w.questionId));
+            const localIds = new Set(localWrongs.map((w: WrongQuestion) => w.questionId));
             wrongList = [...localWrongs, ...wrongList.filter((q) => !localIds.has(q.questionId))];
           }
         } catch {}
 
         setQuestions(wrongList);
-      } catch (err: any) {
-        console.error('Error fetching mistake questions:', err);
+      } catch (err: unknown) {
+        logger.error('Error fetching mistake questions:', err);
         // Fallback to local wrongs if network fails
         try {
-          const localWrongs = JSON.parse(localStorage.getItem('abhi_wrong_questions') || '[]');
+          const localWrongs: WrongQuestion[] = JSON.parse(localStorage.getItem('abhi_wrong_questions') || '[]');
           if (Array.isArray(localWrongs) && localWrongs.length > 0) {
             setQuestions(localWrongs);
             setError(null);
             return;
           }
         } catch {}
-        setError(err.message || 'Failed to load mistake notebook.');
+        setError(err instanceof Error ? err.message : 'Failed to load mistake notebook.');
       } finally {
         setLoading(false);
       }
@@ -443,7 +444,7 @@ export const WrongQuestionsPage: React.FC = () => {
                 <span className="text-xs font-medium text-[var(--ink-muted)] shrink-0">Sort:</span>
                 <select
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
+                  onChange={(e) => setSortBy(e.target.value as 'missCount' | 'recent')}
                   className="px-2.5 py-1.5 bg-[var(--surface-sunken)] border border-[var(--line)] rounded-lg text-xs text-[var(--ink)] focus:outline-none focus:border-[var(--accent)]"
                 >
                   <option value="missCount">Most Missed</option>

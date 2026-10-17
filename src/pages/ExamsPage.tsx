@@ -4,6 +4,7 @@ import { Exam } from '../types';
 import { Search, X, BookOpen, Layers } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { FALLBACK_EXAMS } from '../lib/fallbackData';
+import { logger } from '../lib/logger';
 
 export const ExamsPage: React.FC = () => {
   const { queryParams } = useRouter();
@@ -29,7 +30,7 @@ export const ExamsPage: React.FC = () => {
           setExams(data.exams || []);
         }
       } catch (err) {
-        console.warn('Could not refresh exams list, using cached catalog:', err);
+        logger.warn('Could not refresh exams list, using cached catalog:', err);
       } finally {
         if (isMounted) {
           setLoading(false);

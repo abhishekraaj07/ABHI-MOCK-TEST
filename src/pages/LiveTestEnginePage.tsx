@@ -23,6 +23,7 @@ import {
   Flag,
 } from 'lucide-react';
 import { QuestionReportModal } from '../components/QuestionReportModal';
+import { logger } from '../lib/logger';
 
 interface QuestionAnswerState {
   selectedOption: string | null;
@@ -246,7 +247,7 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
             }
           }
         } catch (e) {
-          console.warn('Error reading local draft recovery:', e);
+          logger.warn('Error reading local draft recovery:', e);
         }
 
         setUserAnswers(answersMap);
@@ -392,7 +393,7 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
         setSaveStatus('error');
       }
     } catch (err) {
-      console.warn('Auto-save network error, response preserved in local storage:', err);
+      logger.warn('Auto-save network error, response preserved in local storage:', err);
       setSaveStatus('error');
     }
   };
@@ -609,7 +610,7 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
         });
       }
     } catch (err) {
-      console.error(err);
+      logger.error(err);
     }
   };
 
@@ -1373,7 +1374,7 @@ class LiveTestErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: any) {
-    console.error('Test Engine Boundary caught an unhandled error:', error, errorInfo);
+    logger.error('Test Engine Boundary caught an unhandled error:', error, errorInfo);
   }
 
   render() {

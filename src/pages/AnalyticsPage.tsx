@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, Link } from '../contexts/RouterContext';
 import { useAuth } from '../contexts/AuthContext';
+import { logger } from '../lib/logger';
 import {
   TrendingUp,
   Award,
@@ -116,7 +117,7 @@ export const AnalyticsPage: React.FC = () => {
           setData(json);
         }
       } catch (err) {
-        console.error('Failed to load analytics:', err);
+        logger.error('Failed to load analytics:', err);
       } finally {
         setLoading(false);
       }

@@ -92,6 +92,7 @@ async function startServer() {
   // API Routes with appropriate rate limiters
   app.use('/api/auth/login', authRateLimiter);
   app.use('/api/auth/register', authRateLimiter);
+  app.use('/api/auth/guest-session', authRateLimiter);
   app.use('/api/auth/firebase-sync', authRateLimiter);
   app.use('/api/auth/change-password', authRateLimiter);
   app.use('/api/auth', authRoutes);

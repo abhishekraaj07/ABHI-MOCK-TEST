@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, Link } from '../contexts/RouterContext';
 import { useAuth } from '../contexts/AuthContext';
+import { logger } from '../lib/logger';
 import {
   Award,
   Target,
@@ -124,7 +125,7 @@ export const DashboardPage: React.FC = () => {
           setData(json);
         }
       } catch (err) {
-        console.error('Failed to load dashboard:', err);
+        logger.error('Failed to load dashboard:', err);
       } finally {
         setLoading(false);
       }

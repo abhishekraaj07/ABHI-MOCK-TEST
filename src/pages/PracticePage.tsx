@@ -2,9 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, Link } from '../contexts/RouterContext';
 import { BookOpen, ChevronRight, HelpCircle } from 'lucide-react';
 import { apiFetch } from '../lib/api';
+import { logger } from '../lib/logger';
+
+interface PracticeTopic {
+  id: string;
+  name: string;
+  questionCount: number;
+}
+
+interface PracticeCategory {
+  name: string;
+  topics: PracticeTopic[];
+}
 
 export const PracticePage: React.FC = () => {
-  const [categories, setCategories] = useState<{ name: string; topics: any[] }[]>([]);
+  const [categories, setCategories] = useState<PracticeCategory[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -17,7 +29,7 @@ export const PracticePage: React.FC = () => {
           setCategories(json.categories || []);
         }
       } catch (e) {
-        console.warn('Practice categories load deferred:', e);
+        logger.warn('Practice categories load deferred:', e);
       } finally {
         if (isMounted) {
           setLoading(false);

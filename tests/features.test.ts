@@ -1,122 +1,241 @@
-import test from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import {
+  parseQuestionsCsv,
+  formatQuestionOptions,
+  validateImportQuestionItem,
+} from '../server/routes/admin';
+import { clampQuestionCount, clampDuration } from '../server/routes/tests';
+import {
+  AdminQuestionSchema,
+  AdminTestSchema,
+  ReportQuestionSchema,
+} from '../server/validators/schemas';
 import { VALID_REPORT_REASONS } from '../server/routes/reports';
 
-test('Features & Business Logic Unit Tests', async (t) => {
-  await t.test('Question Report validation reasons includes required categories', () => {
-    assert.ok(VALID_REPORT_REASONS.includes('wrong_question'));
-    assert.ok(VALID_REPORT_REASONS.includes('wrong_answer'));
-    assert.ok(VALID_REPORT_REASONS.includes('typo'));
-    assert.ok(VALID_REPORT_REASONS.includes('unclear_question'));
-    assert.ok(VALID_REPORT_REASONS.includes('technical_issue'));
-    assert.equal(VALID_REPORT_REASONS.includes('fake_reason' as any), false);
+describe('Features & Business Logic Unit Tests', () => {
+  it('CSV parsing for question import: correctly parses quoted strings, commas, and headers', () => {
+    const csvContent = [
+      'questionText,exam,subject,topic,difficulty,optionA,optionB,optionC,optionD,correctOption,explanation',
+      '"What is 2 + 2, according to arithmetic?",SSC,Math,Arithmetic,Easy,"3, not 4",4,5,6,B,"2 + 2 equals 4"',
+      '"Which planet is known as the ""Red Planet""?",General,Science,Astronomy,Easy,Venus,Mars,Jupiter,Saturn,B,"Mars is red due to iron oxide"',
+    ].join('\n');
+
+    const parsed = parseQuestionsCsv(csvContent);
+    assert.strictEqual(parsed.length, 2);
+
+    // Verify first row with embedded commas inside quotes
+    assert.strictEqual(parsed[0].questiontext, 'What is 2 + 2, according to arithmetic?');
+    assert.strictEqual(parsed[0].optiona, '3, not 4');
+    assert.strictEqual(parsed[0].optionb, '4');
+    assert.strictEqual(parsed[0].correctoption, 'B');
+    assert.strictEqual(parsed[0].explanation, '2 + 2 equals 4');
+
+    // Verify second row
+    assert.strictEqual(parsed[1].optionb, 'Mars');
+    assert.strictEqual(parsed[1].correctoption, 'B');
+
+    // Edge cases: empty string, whitespace only, or header only
+    assert.deepStrictEqual(parseQuestionsCsv(''), []);
+    assert.deepStrictEqual(parseQuestionsCsv('   \n  \n  '), []);
+    assert.deepStrictEqual(parseQuestionsCsv('questionText,exam,subject'), []);
   });
 
-  await t.test('Custom test builder boundary limits clamp properly', () => {
-    const clampCount = (count: number) => Math.min(50, Math.max(5, count || 10));
-    const clampDuration = (dur: number) => Math.min(180, Math.max(5, dur || 15));
+  it('JSON question import validation: validates required fields, types, and constraints', () => {
+    // Valid question payload
+    const validQuestion = {
+      examId: 'exam-ssc',
+      subjectId: 'subj-math',
+      questionText: 'What is the sum of angles in a triangle?',
+      difficulty: 'Easy' as const,
+      marks: 2.0,
+      negativeMarks: 0.5,
+      options: [
+        { optionKey: 'A' as const, optionText: '90 degrees', isCorrect: false },
+        { optionKey: 'B' as const, optionText: '180 degrees', isCorrect: true },
+        { optionKey: 'C' as const, optionText: '270 degrees', isCorrect: false },
+        { optionKey: 'D' as const, optionText: '360 degrees', isCorrect: false },
+      ],
+    };
 
-    assert.equal(clampCount(1), 5); // Below minimum 5 clamped to 5
-    assert.equal(clampCount(100), 50); // Above maximum 50 clamped to 50
-    assert.equal(clampCount(25), 25); // In bounds preserved
+    const validResult = AdminQuestionSchema.safeParse(validQuestion);
+    assert.strictEqual(validResult.success, true);
 
-    assert.equal(clampDuration(2), 5); // Below minimum 5 clamped to 5
-    assert.equal(clampDuration(300), 180); // Above maximum 180 clamped to 180
-    assert.equal(clampDuration(45), 45); // In bounds preserved
+    // Invalid: Question text too short (< 5 characters)
+    const shortTextResult = AdminQuestionSchema.safeParse({
+      ...validQuestion,
+      questionText: 'Why?',
+    });
+    assert.strictEqual(shortTextResult.success, false);
+
+    // Invalid: Less than 2 options
+    const singleOptionResult = AdminQuestionSchema.safeParse({
+      ...validQuestion,
+      options: [{ optionKey: 'A' as const, optionText: 'Only option', isCorrect: true }],
+    });
+    assert.strictEqual(singleOptionResult.success, false);
+
+    // Test import validator helper
+    const itemValidation = validateImportQuestionItem({
+      questionText: 'Valid length question prompt here',
+      optionA: 'Option 1',
+      optionB: 'Option 2',
+      correctOption: 'B',
+    });
+    assert.strictEqual(itemValidation.valid, true);
+
+    const emptyValidation = validateImportQuestionItem({});
+    assert.strictEqual(emptyValidation.valid, false);
+    assert.ok(emptyValidation.error?.includes('5 characters'));
   });
 
-  await t.test('CSV Question Parser accurately parses quoted fields and commas', () => {
-    const csv = `questionText,exam,subject,topic,difficulty,optionA,optionB,optionC,optionD,correctOption,explanation\n"What is 2 + 2, according to math?",SSC,Math,Arithmetic,EASY,"3, not 4",4,5,6,B,"2+2 equals 4"`;
-    
-    const lines = csv.trim().split(/\r?\n/);
-    assert.equal(lines.length, 2);
+  it('Custom test builder limits: enforces min/max question count clamping', () => {
+    // Below minimum 5 clamped to 5
+    assert.strictEqual(clampQuestionCount(1), 5);
+    assert.strictEqual(clampQuestionCount(4), 5);
 
-    const header = lines[0].split(',').map((h) => h.trim());
-    assert.equal(header[0], 'questionText');
-    assert.equal(header[9], 'correctOption');
+    // Above maximum 50 clamped to 50
+    assert.strictEqual(clampQuestionCount(51), 50);
+    assert.strictEqual(clampQuestionCount(100), 50);
+    assert.strictEqual(clampQuestionCount(999), 50);
 
-    // Parse line 2 with quote awareness
-    const line = lines[1];
-    const cols: string[] = [];
-    let current = '';
-    let inQuotes = false;
-    for (let c = 0; c < line.length; c++) {
-      const ch = line[c];
-      if (ch === '"') inQuotes = !inQuotes;
-      else if (ch === ',' && !inQuotes) {
-        cols.push(current.trim());
-        current = '';
-      } else {
-        current += ch;
-      }
-    }
-    cols.push(current.trim());
+    // Within bounds preserved
+    assert.strictEqual(clampQuestionCount(5), 5);
+    assert.strictEqual(clampQuestionCount(25), 25);
+    assert.strictEqual(clampQuestionCount(50), 50);
 
-    assert.equal(cols[0].replace(/"/g, ''), 'What is 2 + 2, according to math?');
-    assert.equal(cols[5].replace(/"/g, ''), '3, not 4');
-    assert.equal(cols[9].replace(/"/g, ''), 'B');
+    // Fallbacks for zero, negative, null, NaN, or non-numeric inputs default to 10
+    assert.strictEqual(clampQuestionCount(0), 10);
+    assert.strictEqual(clampQuestionCount(-10), 5); // parsed as -10, Math.max(5, -10) = 5
+    assert.strictEqual(clampQuestionCount('abc'), 10);
+    assert.strictEqual(clampQuestionCount(undefined), 10);
+    assert.strictEqual(clampQuestionCount(null), 10);
   });
 
-  await t.test('Daily challenge date calculation format is standard YYYY-MM-DD', () => {
-    const today = new Date().toISOString().slice(0, 10);
-    assert.match(today, /^\d{4}-\d{2}-\d{2}$/);
-  });
-
-  await t.test('CSV Question Import correctly resolves correctOption and optionE for 5-option exams', () => {
-    const row = {
+  it('Question validation: ensures at least one correct option exists and formats options properly', () => {
+    // 4 options standard question
+    const standardRow = {
       questionText: 'What is the capital of India?',
       optionA: 'Mumbai',
       optionB: 'New Delhi',
       optionC: 'Kolkata',
       optionD: 'Chennai',
-      optionE: 'None of the above',
       correctOption: 'B',
     };
 
-    const correctKey = String(row.correctOption || 'A').toUpperCase().trim();
-    const optionsList = [
-      { optionKey: 'A', optionText: row.optionA, isCorrect: correctKey === 'A' },
-      { optionKey: 'B', optionText: row.optionB, isCorrect: correctKey === 'B' },
-      { optionKey: 'C', optionText: row.optionC, isCorrect: correctKey === 'C' },
-      { optionKey: 'D', optionText: row.optionD, isCorrect: correctKey === 'D' },
-      { optionKey: 'E', optionText: row.optionE, isCorrect: correctKey === 'E' },
-    ];
+    const formatted = formatQuestionOptions(standardRow);
+    assert.strictEqual(formatted.length, 4);
+    assert.strictEqual(formatted[1].isCorrect, true);
+    assert.strictEqual(formatted[0].isCorrect, false);
+    assert.strictEqual(formatted[1].optionText, 'New Delhi');
 
-    assert.equal(optionsList.length, 5);
-    assert.equal(optionsList[1].isCorrect, true);
-    assert.equal(optionsList[0].isCorrect, false);
-    assert.equal(optionsList[4].optionKey, 'E');
+    // 5 options (Banking pattern with optionE)
+    const fiveOptionRow = {
+      ...standardRow,
+      optionE: 'None of the above',
+      correctOption: 'E',
+    };
+    const formattedFive = formatQuestionOptions(fiveOptionRow);
+    assert.strictEqual(formattedFive.length, 5);
+    assert.strictEqual(formattedFive[4].optionKey, 'E');
+    assert.strictEqual(formattedFive[4].isCorrect, true);
+
+    // If correct option is omitted or invalid, defaults first option (A) to true
+    const noCorrectRow = {
+      questionText: 'Sample prompt?',
+      optionA: 'First Option',
+      optionB: 'Second Option',
+      correctOption: '',
+    };
+    const fallbackCorrect = formatQuestionOptions(noCorrectRow);
+    assert.strictEqual(fallbackCorrect.some((o) => o.isCorrect), true);
+    assert.strictEqual(fallbackCorrect[0].isCorrect, true);
   });
 
-  await t.test('Daily Challenge answers normalizer handles both Array and Object map seamlessly', () => {
-    const arrayPayload = [
-      { questionId: 'q-101', selectedOption: 'C' },
-      { questionId: 'q-102', selectedOption: 'A' },
-    ];
-
-    const mapPayload = {
-      'q-101': 'C',
-      'q-102': 'A',
+  it('Exam duration validation: enforces positive duration limits for admin tests and custom builder', () => {
+    // AdminTestSchema duration checks
+    const validTest = {
+      examId: 'exam-123',
+      title: 'Full Length Test 1',
+      testType: 'Full Length' as const,
+      duration: 60,
+      totalMarks: 100,
+      negativeMarks: 0.25,
+      difficulty: 'Moderate' as const,
     };
 
-    const normalize = (answers: any): Record<string, string> => {
-      const userAnswers: Record<string, string> = {};
-      if (Array.isArray(answers)) {
-        answers.forEach((ans: any) => {
-          const qId = ans?.questionId || ans?.id;
-          const opt = ans?.selectedOption ?? ans?.selectedAnswer ?? ans?.optionKey;
-          if (qId && typeof opt === 'string') userAnswers[qId] = opt;
-        });
-      } else if (answers && typeof answers === 'object') {
-        Object.assign(userAnswers, answers);
-      }
-      return userAnswers;
-    };
+    const validParsed = AdminTestSchema.safeParse(validTest);
+    assert.strictEqual(validParsed.success, true);
 
-    const fromArray = normalize(arrayPayload);
-    const fromMap = normalize(mapPayload);
+    // Negative duration rejected
+    const negativeDuration = AdminTestSchema.safeParse({
+      ...validTest,
+      duration: -30,
+    });
+    assert.strictEqual(negativeDuration.success, false);
 
-    assert.deepEqual(fromArray, { 'q-101': 'C', 'q-102': 'A' });
-    assert.deepEqual(fromMap, { 'q-101': 'C', 'q-102': 'A' });
+    // Zero duration rejected
+    const zeroDuration = AdminTestSchema.safeParse({
+      ...validTest,
+      duration: 0,
+    });
+    assert.strictEqual(zeroDuration.success, false);
+
+    // Non-integer duration rejected
+    const floatDuration = AdminTestSchema.safeParse({
+      ...validTest,
+      duration: 45.5,
+    });
+    assert.strictEqual(floatDuration.success, false);
+
+    // Custom test builder duration clamping (5 min to 180 min, default 15)
+    assert.strictEqual(clampDuration(2), 5); // Below minimum 5 clamped to 5
+    assert.strictEqual(clampDuration(300), 180); // Above maximum 180 clamped to 180
+    assert.strictEqual(clampDuration(45), 45); // Within bounds preserved
+    assert.strictEqual(clampDuration(0), 15); // Fallback to 15
+    assert.strictEqual(clampDuration('invalid'), 15);
+  });
+
+  it('Question dispute reporting: validates allowed reason categories and description length', () => {
+    // Allowed reasons verification
+    const expectedReasons = ['wrong_question', 'wrong_answer', 'typo', 'unclear_question', 'technical_issue'];
+    for (const reason of expectedReasons) {
+      assert.ok(VALID_REPORT_REASONS.includes(reason as any));
+    }
+    assert.strictEqual(VALID_REPORT_REASONS.includes('fake_reason' as any), false);
+
+    // Valid report schema parsing
+    const validReport = ReportQuestionSchema.safeParse({
+      questionId: 'q-999',
+      reason: 'typo',
+      description: 'The spelling of hypothesis is incorrect in option B.',
+    });
+    assert.strictEqual(validReport.success, true);
+
+    // Short description rejected (< 5 chars)
+    const shortDesc = ReportQuestionSchema.safeParse({
+      questionId: 'q-999',
+      reason: 'typo',
+      description: 'Bad',
+    });
+    assert.strictEqual(shortDesc.success, false);
+
+    // Invalid reason enum rejected
+    const invalidReason = ReportQuestionSchema.safeParse({
+      questionId: 'q-999',
+      reason: 'inappropriate',
+      description: 'Valid long description of the problem.',
+    });
+    assert.strictEqual(invalidReason.success, false);
+  });
+
+  it('Daily challenge date calculation format conforms strictly to standard YYYY-MM-DD', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    assert.match(today, /^\d{4}-\d{2}-\d{2}$/);
+
+    const [year, month, day] = today.split('-').map(Number);
+    assert.ok(year >= 2024);
+    assert.ok(month >= 1 && month <= 12);
+    assert.ok(day >= 1 && day <= 31);
   });
 });

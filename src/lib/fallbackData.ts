@@ -1,3 +1,11 @@
+/**
+ * Fallback / Demo Data
+ * 
+ * This data is shown ONLY when the API server is unreachable.
+ * These are synthetic placeholder entries and do NOT represent real users or scores.
+ * @mock
+ */
+
 import { Exam, ExamDetail, SubjectDetail, TestSummary } from '../types';
 import dbDataRaw from './dbData.json';
 
@@ -104,6 +112,145 @@ export const FALLBACK_STATS = {
   totalQuestions: FALLBACK_QUESTIONS.length || 140,
   availabilityRate: '99.98%',
 };
+
+/**
+ * Fallback leaderboard entries shown when API server is unreachable.
+ * @mock
+ * @fallback
+ */
+export const FALLBACK_LEADERBOARD = [
+  { rank: 1, name: 'Ananya Sharma', score: 94.5, accuracy: 96, percentile: 99.8, avatar: 'AS' },
+  { rank: 2, name: 'Rohan Verma', score: 91.0, accuracy: 93, percentile: 99.2, avatar: 'RV' },
+  { rank: 3, name: 'Priya Patel', score: 88.75, accuracy: 91, percentile: 98.7, avatar: 'PP' },
+  { rank: 4, name: 'Amit Kumar', score: 86.25, accuracy: 89, percentile: 97.9, avatar: 'AK' },
+  { rank: 5, name: 'Sneha Roy', score: 84.5, accuracy: 88, percentile: 96.5, avatar: 'SR' },
+  { rank: 6, name: 'You', score: 78.5, accuracy: 84, percentile: 92.1, avatar: 'ME', isUser: true },
+];
+
+/**
+ * Fallback analytics overview metrics.
+ * @mock
+ * @fallback
+ */
+export const FALLBACK_ANALYTICS_OVERVIEW = {
+  testsAttempted: 14,
+  avgScore: 72.4,
+  avgAccuracy: 84.6,
+  totalTimeHours: 18.5,
+  percentile: 88.3,
+};
+
+/**
+ * Fallback weak areas list for candidate analytics.
+ * @mock
+ * @fallback
+ */
+export const FALLBACK_ANALYTICS_WEAK_AREAS = [
+  { subject: 'Quantitative Aptitude', topic: 'Data Interpretation', accuracy: 52 },
+  { subject: 'Reasoning Ability', topic: 'Floor & Flat Puzzles', accuracy: 58 },
+  { subject: 'English Language', topic: 'Sentence Rearrangement', accuracy: 64 },
+];
+
+/**
+ * Fallback dashboard performance trend points.
+ * @mock
+ * @fallback
+ */
+export const FALLBACK_DASHBOARD_TREND = [
+  { index: 1, date: 'Prev', title: 'Diagnostic Drill', score: 72, accuracy: 80, percentage: 72 },
+  { index: 2, date: 'Recent', title: 'Speed Test', score: 78.5, accuracy: 84.5, percentage: 78.5 },
+];
+
+/**
+ * Fallback weak subjects analysis on the dashboard.
+ * @mock
+ * @fallback
+ */
+export const FALLBACK_DASHBOARD_WEAK_SUBJECTS = [
+  { subject: 'Quantitative Aptitude', accuracy: 56.4, totalQuestions: 25 },
+  { subject: 'Reasoning Ability', accuracy: 62.0, totalQuestions: 30 },
+];
+
+/**
+ * Fallback AI recommendations on the candidate dashboard.
+ * @mock
+ * @fallback
+ */
+export const FALLBACK_DASHBOARD_RECOMMENDATIONS = [
+  {
+    title: 'Focus Drill: Quantitative Aptitude',
+    reason: 'Your accuracy is currently 56.4% across 25 attempted questions.',
+    action: 'Practice Topics',
+    link: '/practice',
+  },
+  {
+    title: 'Attempt Full-Length Mock Test',
+    reason: 'Consistent timed pacing improves retention and sectional cutoffs.',
+    action: 'Browse Mock Tests',
+    link: '/mock-tests',
+  },
+];
+
+/**
+ * Fallback recent test attempts for new/empty candidate histories.
+ * @mock
+ * @fallback
+ */
+export const FALLBACK_RECENT_TESTS = [
+  {
+    attemptId: 'att_de94ec9c-7468-42bd-8206-20edf41c9295_recent',
+    testId: 'de94ec9c-7468-42bd-8206-20edf41c9295',
+    title: 'SBI PO Prelims Full Mock 1',
+    examName: 'SBI PO',
+    score: 78.5,
+    totalMarks: 100,
+    percentage: 78.5,
+    accuracy: 84.5,
+    status: 'COMPLETED',
+    submittedAt: new Date().toISOString(),
+  },
+];
+
+/**
+ * Fallback Gemini AI personas for offline/demo chat assistance.
+ * @mock
+ * @fallback
+ */
+export const FALLBACK_GEMINI_PERSONAS = [
+  { id: 'exam-mentor', name: 'Exam Mentor', description: 'Holistic strategy, timetables & section management' },
+  { id: 'quant-reasoning', name: 'Quant & Reasoning Master', description: 'Step-by-step proofs + 20-second shortcut tricks' },
+  { id: 'quick-doubts', name: 'Lightning Doubts', description: 'Rapid formula verification & quick answers' },
+  { id: 'question-explainer', name: 'Question Dissector', description: 'Option trap analysis & deep-dive solutions' },
+];
+
+/**
+ * Fallback supported Gemini AI models list.
+ * @mock
+ * @fallback
+ */
+export const FALLBACK_GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'];
+
+/**
+ * Fallback admin overview statistics.
+ * @mock
+ * @fallback
+ */
+export const FALLBACK_ADMIN_STATS = {
+  totalUsers: 148,
+  totalAttempts: 1420,
+  averagePlatformScore: 72.8,
+  activeCandidates: 34,
+  recentSignups: 12,
+};
+
+/**
+ * Fallback admin user roster.
+ * @mock
+ * @fallback
+ */
+export const FALLBACK_ADMIN_USERS = [
+  { id: 'u-1', name: 'Abhishek Kumar', email: 'abhishek@mocktest.com', role: 'ADMIN', createdAt: new Date().toISOString() },
+];
 
 // ==========================================
 // EXAM DETAIL BUILDER (testsGrouped contract)

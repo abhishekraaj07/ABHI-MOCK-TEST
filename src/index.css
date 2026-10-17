@@ -55,3 +55,9 @@ body {
   background: var(--ink);
   opacity: 0.3;
 }
+
+/* Disable native Edge/IE password reveal & clear buttons to avoid double-eye conflicts */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}

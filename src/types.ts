@@ -212,3 +212,49 @@ export interface AttemptHistoryItem {
   wrongCount: number;
   unansweredCount: number;
 }
+
+export interface BookmarkItem {
+  id: string;
+  questionId: string;
+  questionText: string;
+  subjectName?: string;
+  topicName?: string;
+  examName?: string;
+  difficulty?: string;
+  explanation?: string;
+  correctOptionKey?: string;
+  correctOptionText?: string;
+  createdAt?: string;
+  options: QuestionOption[];
+}
+
+export interface WrongQuestionItem {
+  questionId: string;
+  questionText: string;
+  difficulty: string;
+  marks: number;
+  negativeMarks: number;
+  explanation: string;
+  shortcut?: string | null;
+  subjectName: string;
+  topicName: string;
+  examName: string;
+  correctOptionKey: string;
+  correctOptionText: string;
+  lastChosenOption: string | null;
+  missCount: number;
+  lastAttemptDate: string;
+  lastTestTitle: string;
+  options: QuestionOption[];
+}
+
+export interface LeaderboardEntry {
+  userId: string;
+  rank: number;
+  displayName: string;
+  totalScore: number;
+  averageScore: number;
+  bestScore: number;
+  averageAccuracy: number;
+  testsAttempted: number;
+}

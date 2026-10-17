@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, Link } from '../contexts/RouterContext';
 import { ArrowLeft, Bookmark, BookmarkCheck, CheckCircle2, XCircle, ChevronRight, Flag } from 'lucide-react';
 import { QuestionReportModal } from '../components/QuestionReportModal';
+import { logger } from '../lib/logger';
 
 export const TopicPracticePage: React.FC<{ topicId: string }> = ({ topicId }) => {
   const { navigate } = useRouter();
@@ -36,7 +37,7 @@ export const TopicPracticePage: React.FC<{ topicId: string }> = ({ topicId }) =>
           setBookmarkedSet(bSet);
         }
       } catch (e) {
-        console.error(e);
+        logger.error(e);
       } finally {
         setLoading(false);
       }
@@ -73,7 +74,7 @@ export const TopicPracticePage: React.FC<{ topicId: string }> = ({ topicId }) =>
         });
       }
     } catch (e) {
-      console.error(e);
+      logger.error(e);
     }
   };
 

@@ -22,11 +22,18 @@ import {
   limit,
 } from 'firebase/firestore';
 import defaultConfig from '../../firebase-applet-config.example.json';
+import { logger } from './logger';
 
 // Safely discover local uncommitted config if present, otherwise use example config
+interface LocalConfigModule {
+  default?: Record<string, string>;
+  [key: string]: unknown;
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const metaAny = import.meta as any;
-const localConfigs = typeof metaAny?.glob === 'function' ? metaAny.glob('../../firebase-applet-config.json', { eager: true }) : {};
-const localConfig = (localConfigs['../../firebase-applet-config.json'] as any)?.default || {};
+const localConfigs: Record<string, LocalConfigModule> =
+  typeof metaAny?.glob === 'function' ? metaAny.glob('../../firebase-applet-config.json', { eager: true }) : {};
+const localConfig: Record<string, string> = localConfigs['../../firebase-applet-config.json']?.default || {};
 
 const firebaseConfig = {
   ...defaultConfig,
@@ -138,7 +145,7 @@ export async function syncUserToFirestore(user: {
     await setDoc(userRef, userData, { merge: true });
     return userData;
   } catch (error) {
-    console.warn('Firestore user sync notice:', error);
+    logger.warn('Firestore user sync notice:', error);
     return null;
   }
 }
@@ -152,7 +159,7 @@ export async function persistAttemptToFirestore(userId: string, attempt: Firesto
     await setDoc(attemptRef, attempt, { merge: true });
     return true;
   } catch (error) {
-    console.warn('Firestore attempt persistence notice:', error);
+    logger.warn('Firestore attempt persistence notice:', error);
     return false;
   }
 }
@@ -184,7 +191,7 @@ export async function persistBookmarkToFirestore(
     );
     return true;
   } catch (error) {
-    console.warn('Firestore bookmark persistence notice:', error);
+    logger.warn('Firestore bookmark persistence notice:', error);
     return false;
   }
 }
@@ -219,7 +226,7 @@ export async function persistChatMessageToFirestore(
     );
     return true;
   } catch (error) {
-    console.warn('Firestore chat persistence notice:', error);
+    logger.warn('Firestore chat persistence notice:', error);
     return false;
   }
 }
@@ -234,7 +241,7 @@ export async function fetchUserAttemptsFromFirestore(userId: string): Promise<Fi
     const snapshot = await getDocs(q);
     return snapshot.docs.map((d) => d.data() as FirestoreAttempt);
   } catch (error) {
-    console.warn('Firestore fetch attempts notice:', error);
+    logger.warn('Firestore fetch attempts notice:', error);
     return [];
   }
 }

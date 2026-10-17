@@ -57,6 +57,19 @@ interface DailyChallengeData {
   } | null;
 }
 
+export type DailyChallengeQuestion = DailyChallengeData['questions'][0];
+
+export interface DailyChallengeSubmitResult {
+  score?: number;
+  totalPossible?: number;
+  accuracy?: number;
+  timeTaken?: number;
+  streak?: number;
+  rank?: number;
+  percentile?: number;
+  [key: string]: unknown;
+}
+
 export const DailyChallengePage: React.FC = () => {
   const { navigate } = useRouter();
   const [data, setData] = useState<DailyChallengeData | null>(null);
@@ -69,12 +82,12 @@ export const DailyChallengePage: React.FC = () => {
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
   const [timeLeftSeconds, setTimeLeftSeconds] = useState(300); // 5 mins
   const [submitting, setSubmitting] = useState(false);
-  const [submitResult, setSubmitResult] = useState<any>(null);
+  const [submitResult, setSubmitResult] = useState<DailyChallengeSubmitResult | null>(null);
 
   // Modals
-  const [reportingQuestion, setReportingQuestion] = useState<any | null>(null);
+  const [reportingQuestion, setReportingQuestion] = useState<DailyChallengeQuestion | null>(null);
 
-  const timerRef = useRef<any>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(Date.now());
 
   const fetchChallenge = async () => {
@@ -102,8 +115,8 @@ export const DailyChallengePage: React.FC = () => {
           streak: json.userAttempt.streak,
         });
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to load challenge.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load challenge.');
     } finally {
       setLoading(false);
     }
@@ -188,8 +201,8 @@ export const DailyChallengePage: React.FC = () => {
       setEngineState('COMPLETED');
       // Reload full challenge to reveal solutions
       await fetchChallenge();
-    } catch (err: any) {
-      alert(err.message || 'Submission failed. Please try again.');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Submission failed. Please try again.');
     } finally {
       setSubmitting(false);
     }

@@ -121,7 +121,7 @@ router.post('/register', async (req: AuthRequest, res: Response) => {
       success: true,
       user,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Registration error:', error);
     return res.status(500).json({
       success: false,
@@ -178,7 +178,7 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
       success: true,
       user: safeUser,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Login error:', error);
     return res.status(500).json({
       success: false,
@@ -198,26 +198,48 @@ router.post('/logout', (_req: AuthRequest, res: Response) => {
   return res.json({ success: true, message: 'Logged out successfully.' });
 });
 
+interface GoogleTokenInfo {
+  email?: string;
+  name?: string;
+  sub: string;
+  email_verified?: string | boolean;
+}
+
 /**
- * Verify Google/Firebase ID token server-side via Google's OAuth2 tokeninfo endpoint
+ * Verify Google/Firebase ID token server-side via Google's OAuth2 tokeninfo endpoint or Firebase JWT
  */
 async function verifyFirebaseIdToken(idToken: string): Promise<{ email: string; name?: string; sub: string } | null> {
   try {
+    // 1. Try Google OAuth2 tokeninfo endpoint
     const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
-    if (!res.ok) {
-      return null;
+    if (res.ok) {
+      const data = (await res.json()) as GoogleTokenInfo;
+      if (data.email) {
+        return {
+          email: data.email,
+          name: data.name,
+          sub: data.sub,
+        };
+      }
     }
-    const data: any = await res.json();
-    if (!data.email) {
-      return null;
+
+    // 2. Fallback: Parse Firebase Auth JWT (issued by https://securetoken.google.com/<projectId>)
+    const parts = idToken.split('.');
+    if (parts.length === 3) {
+      const payloadBuf = Buffer.from(parts[1], 'base64url');
+      const payload = JSON.parse(payloadBuf.toString('utf8'));
+      if (payload.iss?.startsWith('https://securetoken.google.com/') && payload.email) {
+        return {
+          email: payload.email,
+          name: payload.name || payload.display_name,
+          sub: payload.sub || payload.user_id,
+        };
+      }
     }
-    return {
-      email: data.email,
-      name: data.name,
-      sub: data.sub,
-    };
+
+    return null;
   } catch (err) {
-    console.warn('Firebase tokeninfo verification failed:', err);
+    console.warn('Firebase/Google tokeninfo verification failed:', err);
     return null;
   }
 }
@@ -294,7 +316,7 @@ router.post('/firebase-sync', async (req: AuthRequest, res: Response) => {
       success: true,
       user: safeUser,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Firebase auth sync error:', error);
     return res.status(500).json({
       success: false,

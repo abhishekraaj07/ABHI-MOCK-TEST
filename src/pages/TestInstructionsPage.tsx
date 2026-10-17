@@ -108,7 +108,7 @@ export const TestInstructionsPage: React.FC<{ testId: string }> = ({ testId }) =
       } else {
         setErrorMessage('Failed to initialize test session. Please try again.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Offline / network fallback
       try {
         const fallback = (await import('../lib/fallbackData')).startFallbackTestAttempt(testId);
@@ -117,7 +117,7 @@ export const TestInstructionsPage: React.FC<{ testId: string }> = ({ testId }) =
           return;
         }
       } catch {}
-      setErrorMessage(err.message || 'Network error.');
+      setErrorMessage(err instanceof Error ? err.message : 'Network error.');
     } finally {
       setStarting(false);
     }

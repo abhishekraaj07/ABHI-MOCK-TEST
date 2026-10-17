@@ -6,6 +6,7 @@ import { PaletteLegend } from '../components/PaletteLegend';
 import { Clock, CheckCircle2, Shield, BarChart3, ArrowRight, ChevronRight, ChevronLeft } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { FALLBACK_EXAMS, FALLBACK_STATS } from '../lib/fallbackData';
+import { logger } from '../lib/logger';
 import { BCA_DEMO_25_QUESTIONS } from '../data/bcaDemoQuestions';
 
 export const LandingPage: React.FC = () => {
@@ -132,7 +133,7 @@ export const LandingPage: React.FC = () => {
           }
         }
       } catch (err) {
-        console.warn('Could not refresh landing exams, using cached catalog:', err);
+        logger.warn('Could not refresh landing exams, using cached catalog:', err);
       } finally {
         if (isMounted) {
           setLoading(false);

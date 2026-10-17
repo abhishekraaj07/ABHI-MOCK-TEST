@@ -4,6 +4,7 @@ import { TestSummary } from '../types';
 import { Search, X, Lock, Clock, Award, HelpCircle, ChevronRight } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { FALLBACK_EXAMS } from '../lib/fallbackData';
+import { logger } from '../lib/logger';
 
 export const MockTestsPage: React.FC = () => {
   const { queryParams } = useRouter();
@@ -46,7 +47,7 @@ export const MockTestsPage: React.FC = () => {
           }
         }
       } catch (e) {
-        console.warn('Could not refresh exam filter list, using fallback:', e);
+        logger.warn('Could not refresh exam filter list, using fallback:', e);
       }
     }
     loadExams();
@@ -73,7 +74,7 @@ export const MockTestsPage: React.FC = () => {
           setTests(data.tests || []);
         }
       } catch (err) {
-        console.warn('Failed to load tests:', err);
+        logger.warn('Failed to load tests:', err);
       } finally {
         if (isMounted) {
           setLoading(false);

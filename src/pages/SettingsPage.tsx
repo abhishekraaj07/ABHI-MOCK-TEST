@@ -14,6 +14,8 @@ import {
   AlertCircle,
   LogOut,
   Trash2,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
@@ -36,6 +38,9 @@ export const SettingsPage: React.FC = () => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordStatus, setPasswordStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [updatingPassword, setUpdatingPassword] = useState(false);
 
@@ -84,8 +89,8 @@ export const SettingsPage: React.FC = () => {
       return;
     }
 
-    if (newPassword.length < 6) {
-      setPasswordStatus({ type: 'error', message: 'New password must be at least 6 characters.' });
+    if (newPassword.length < 8) {
+      setPasswordStatus({ type: 'error', message: 'New password must be at least 8 characters.' });
       return;
     }
 
@@ -320,35 +325,68 @@ export const SettingsPage: React.FC = () => {
           <form onSubmit={handlePasswordChange} className="space-y-3.5 max-w-md text-xs font-medium">
             <div>
               <label className="block mb-1 opacity-80">Current Password</label>
-              <input
-                type="password"
-                required
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full rounded border border-[var(--line)] bg-[var(--paper)] px-3.5 py-2 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
-              />
+              <div className="relative flex items-center">
+                <input
+                  type={showCurrentPassword ? 'text' : 'password'}
+                  required
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full rounded border border-[var(--line)] bg-[var(--paper)] px-3.5 py-2 pr-10 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPassword((prev) => !prev)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--ink)] opacity-70 hover:opacity-100 transition-opacity p-1 cursor-pointer z-10"
+                  aria-label={showCurrentPassword ? 'Hide current password' : 'Show current password'}
+                  tabIndex={0}
+                >
+                  {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             <div>
-              <label className="block mb-1 opacity-80">New Password (min. 6 characters)</label>
-              <input
-                type="password"
-                required
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full rounded border border-[var(--line)] bg-[var(--paper)] px-3.5 py-2 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
-              />
+              <label className="block mb-1 opacity-80">New Password (min. 8 characters)</label>
+              <div className="relative flex items-center">
+                <input
+                  type={showNewPassword ? 'text' : 'password'}
+                  required
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full rounded border border-[var(--line)] bg-[var(--paper)] px-3.5 py-2 pr-10 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword((prev) => !prev)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--ink)] opacity-70 hover:opacity-100 transition-opacity p-1 cursor-pointer z-10"
+                  aria-label={showNewPassword ? 'Hide new password' : 'Show new password'}
+                  tabIndex={0}
+                >
+                  {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             <div>
               <label className="block mb-1 opacity-80">Confirm New Password</label>
-              <input
-                type="password"
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full rounded border border-[var(--line)] bg-[var(--paper)] px-3.5 py-2 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
-              />
+              <div className="relative flex items-center">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full rounded border border-[var(--line)] bg-[var(--paper)] px-3.5 py-2 pr-10 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--ink)] opacity-70 hover:opacity-100 transition-opacity p-1 cursor-pointer z-10"
+                  aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                  tabIndex={0}
+                >
+                  {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             <button

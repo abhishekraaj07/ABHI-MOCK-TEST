@@ -279,6 +279,14 @@ router.post('/:id/start', authenticate, async (req: AuthRequest, res: Response) 
   }
 });
 
+export function clampQuestionCount(count: any): number {
+  return Math.min(50, Math.max(5, parseInt(String(count), 10) || 10));
+}
+
+export function clampDuration(duration: any): number {
+  return Math.min(180, Math.max(5, parseInt(String(duration), 10) || 15));
+}
+
 // POST /api/tests/custom - Generate custom test from real question bank (§Feature 12)
 router.post('/custom', authenticate, async (req: AuthRequest, res: Response) => {
   try {
@@ -304,8 +312,8 @@ router.post('/custom', authenticate, async (req: AuthRequest, res: Response) => 
       return res.status(404).json({ error: 'Selected examination not found.' });
     }
 
-    const count = Math.min(50, Math.max(5, parseInt(String(questionCount), 10) || 10));
-    const durationMinutes = Math.min(180, Math.max(5, parseInt(String(duration), 10) || 15));
+    const count = clampQuestionCount(questionCount);
+    const durationMinutes = clampDuration(duration);
 
     // Build question criteria
     const where: any = { examId: exam.id };

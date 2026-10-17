@@ -5,6 +5,7 @@ import { Clock, CheckCircle2, RotateCcw, ArrowRight } from 'lucide-react';
 
 import { useAuth } from '../contexts/AuthContext';
 import { apiFetch } from '../lib/api';
+import { logger } from '../lib/logger';
 
 export const MyTestsPage: React.FC = () => {
   const { navigate } = useRouter();
@@ -46,7 +47,7 @@ export const MyTestsPage: React.FC = () => {
         try {
           const localHistory = JSON.parse(localStorage.getItem('abhi_test_history') || '[]');
           if (Array.isArray(localHistory) && localHistory.length > 0) {
-            const convertedLocal: AttemptHistoryItem[] = localHistory.map((h: any) => ({
+            const convertedLocal: AttemptHistoryItem[] = localHistory.map((h: Partial<AttemptHistoryItem> & { durationMinutes?: number }) => ({
               id: h.id,
               testId: h.testId,
               testTitle: h.testTitle,
@@ -80,7 +81,7 @@ export const MyTestsPage: React.FC = () => {
 
         setAttempts(attemptList);
       } catch (e) {
-        console.error('Failed to load attempts:', e);
+        logger.error('Failed to load attempts:', e);
       } finally {
         setLoading(false);
       }

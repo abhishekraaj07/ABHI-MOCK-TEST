@@ -805,6 +805,99 @@ router.delete('/questions/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
+export function parseQuestionsCsv(csv: string): any[] {
+  if (typeof csv !== 'string' || !csv.trim()) {
+    return [];
+  }
+  const lines = csv.trim().split(/\r?\n/);
+  if (lines.length <= 1) return [];
+
+  const header = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/"/g, ''));
+  const rows: any[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    // Basic CSV quote-aware splitting
+    const cols: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let c = 0; c < line.length; c++) {
+      const ch = line[c];
+      if (ch === '"') {
+        inQuotes = !inQuotes;
+      } else if (ch === ',' && !inQuotes) {
+        cols.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    cols.push(current.trim());
+
+    const row: any = {};
+    header.forEach((h, idx) => {
+      row[h] = cols[idx] ? cols[idx].replace(/^"|"$/g, '').trim() : '';
+    });
+    rows.push(row);
+  }
+  return rows;
+}
+
+export function formatQuestionOptions(item: any): Array<{ optionKey: string; optionText: string; isCorrect: boolean }> {
+  let optionsList: Array<{ optionKey: string; optionText: string; isCorrect: boolean }> = [];
+  if (Array.isArray(item.options) && item.options.length >= 2) {
+    optionsList = item.options.map((o: any) => ({
+      optionKey: String(o.optionKey || o.key).toUpperCase().trim(),
+      optionText: String(o.optionText || o.text).trim(),
+      isCorrect: Boolean(o.isCorrect),
+    }));
+  } else if (item.optionA && item.optionB) {
+    const correctKey = String(item.correctOption || item.correctAnswer || item.correctKey || item.correct || 'A').toUpperCase().trim();
+    optionsList = [
+      { optionKey: 'A', optionText: String(item.optionA).trim(), isCorrect: correctKey === 'A' },
+      { optionKey: 'B', optionText: String(item.optionB).trim(), isCorrect: correctKey === 'B' },
+    ];
+    if (item.optionC) {
+      optionsList.push({ optionKey: 'C', optionText: String(item.optionC).trim(), isCorrect: correctKey === 'C' });
+    }
+    if (item.optionD) {
+      optionsList.push({ optionKey: 'D', optionText: String(item.optionD).trim(), isCorrect: correctKey === 'D' });
+    }
+    if (item.optionE) {
+      optionsList.push({ optionKey: 'E', optionText: String(item.optionE).trim(), isCorrect: correctKey === 'E' });
+    }
+  }
+
+  // Ensure at least one correct option exists
+  if (optionsList.length >= 2 && !optionsList.some((o) => o.isCorrect)) {
+    optionsList[0].isCorrect = true; // Default to first if missing
+  }
+
+  return optionsList;
+}
+
+export function validateImportQuestionItem(item: any): { valid: boolean; error?: string } {
+  if (!item || typeof item !== 'object') {
+    return { valid: false, error: 'Question data must be an object.' };
+  }
+  const qText = item.questionText || item.question || item.text;
+  if (!qText || typeof qText !== 'string' || qText.trim().length < 5) {
+    return { valid: false, error: 'Question text must be at least 5 characters long.' };
+  }
+
+  const options = formatQuestionOptions(item);
+  if (options.length < 2) {
+    return { valid: false, error: 'Question must have at least 2 options.' };
+  }
+
+  if (!options.some((o) => o.isCorrect)) {
+    return { valid: false, error: 'Question must have at least one correct option.' };
+  }
+
+  return { valid: true };
+}
+
 // POST /api/admin/questions/import - Bulk Import Question Bank (§Phase 7)
 router.post('/questions/import', async (req: AuthRequest, res: Response) => {
   try {
@@ -814,36 +907,7 @@ router.post('/questions/import', async (req: AuthRequest, res: Response) => {
 
     // 1. If raw CSV string provided, parse CSV lines
     if (typeof csv === 'string' && csv.trim()) {
-      const lines = csv.trim().split(/\r?\n/);
-      if (lines.length > 1) {
-        const header = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/"/g, ''));
-        for (let i = 1; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (!line) continue;
-          // Basic CSV quote-aware splitting
-          const cols: string[] = [];
-          let current = '';
-          let inQuotes = false;
-          for (let c = 0; c < line.length; c++) {
-            const ch = line[c];
-            if (ch === '"') {
-              inQuotes = !inQuotes;
-            } else if (ch === ',' && !inQuotes) {
-              cols.push(current.trim());
-              current = '';
-            } else {
-              current += ch;
-            }
-          }
-          cols.push(current.trim());
-
-          const row: any = {};
-          header.forEach((h, idx) => {
-            row[h] = cols[idx] ? cols[idx].replace(/^"|"$/g, '').trim() : '';
-          });
-          itemsToProcess.push(row);
-        }
-      }
+      itemsToProcess = parseQuestionsCsv(csv);
     } else if (Array.isArray(rawList)) {
       itemsToProcess = rawList;
     }
@@ -853,6 +917,7 @@ router.post('/questions/import', async (req: AuthRequest, res: Response) => {
         error: 'No valid questions found in payload. Provide a JSON array in "questions" or CSV string in "csv".',
       });
     }
+
 
     // Cache existing exams and subjects for ID resolution
     const [allExams, allSubjects] = await Promise.all([
@@ -914,39 +979,12 @@ router.post('/questions/import', async (req: AuthRequest, res: Response) => {
       }
 
       // Format options
-      let optionsList: Array<{ optionKey: string; optionText: string; isCorrect: boolean }> = [];
-      if (Array.isArray(item.options) && item.options.length >= 2) {
-        optionsList = item.options.map((o: any) => ({
-          optionKey: String(o.optionKey || o.key).toUpperCase().trim(),
-          optionText: String(o.optionText || o.text).trim(),
-          isCorrect: Boolean(o.isCorrect),
-        }));
-      } else if (item.optionA && item.optionB) {
-        const correctKey = String(item.correctOption || item.correctAnswer || item.correctKey || item.correct || 'A').toUpperCase().trim();
-        optionsList = [
-          { optionKey: 'A', optionText: String(item.optionA).trim(), isCorrect: correctKey === 'A' },
-          { optionKey: 'B', optionText: String(item.optionB).trim(), isCorrect: correctKey === 'B' },
-        ];
-        if (item.optionC) {
-          optionsList.push({ optionKey: 'C', optionText: String(item.optionC).trim(), isCorrect: correctKey === 'C' });
-        }
-        if (item.optionD) {
-          optionsList.push({ optionKey: 'D', optionText: String(item.optionD).trim(), isCorrect: correctKey === 'D' });
-        }
-        if (item.optionE) {
-          optionsList.push({ optionKey: 'E', optionText: String(item.optionE).trim(), isCorrect: correctKey === 'E' });
-        }
-      }
+      const optionsList = formatQuestionOptions(item);
 
       if (optionsList.length < 2) {
         failedCount++;
         errors.push(`Row ${itemNum}: Question must have at least 2 options.`);
         continue;
-      }
-
-      // Ensure at least one correct option exists
-      if (!optionsList.some((o) => o.isCorrect)) {
-        optionsList[0].isCorrect = true; // Default to first if missing
       }
 
       // Check duplicate

@@ -9,6 +9,18 @@ import {
   FALLBACK_PRACTICE_CATEGORIES,
   FALLBACK_QUESTIONS,
   FALLBACK_STATS,
+  FALLBACK_TESTS,
+  FALLBACK_LEADERBOARD,
+  FALLBACK_ANALYTICS_OVERVIEW,
+  FALLBACK_ANALYTICS_WEAK_AREAS,
+  FALLBACK_DASHBOARD_TREND,
+  FALLBACK_DASHBOARD_WEAK_SUBJECTS,
+  FALLBACK_DASHBOARD_RECOMMENDATIONS,
+  FALLBACK_RECENT_TESTS,
+  FALLBACK_GEMINI_PERSONAS,
+  FALLBACK_GEMINI_MODELS,
+  FALLBACK_ADMIN_STATS,
+  FALLBACK_ADMIN_USERS,
   filterFallbackTests,
   getFallbackDailyChallenge,
   submitFallbackDailyChallenge,
@@ -16,9 +28,39 @@ import {
   saveFallbackAttemptAnswer,
   submitFallbackTestAttempt,
   getFallbackTestResult,
-  FALLBACK_TESTS,
   getFallbackExamDetail,
 } from './fallbackData';
+import { logger } from './logger';
+import { AttemptHistoryItem, BookmarkItem, QuestionOption, WrongQuestionItem } from '../types';
+
+interface FallbackQuestionItem {
+  id: string;
+  questionText: string;
+  difficulty?: string;
+  marks?: number;
+  negativeMarks?: number;
+  explanation?: string;
+  shortcut?: string | null;
+  subjectName?: string;
+  subject?: { name?: string };
+  topicName?: string;
+  topic?: { name?: string };
+  options?: QuestionOption[];
+}
+
+interface ClientRequestBody {
+  questionId?: string;
+  selectedOption?: string | null;
+  status?: string;
+  timeSpentSeconds?: number;
+  timeSpent?: number;
+  timeTaken?: number;
+  answers?: Record<string, string>;
+  answerList?: Array<{ questionId?: string; id?: string; selectedOption?: string | null }>;
+  messages?: Array<{ role: string; content: string }>;
+  model?: string;
+  [key: string]: unknown;
+}
 
 /**
  * Client-Side API Router: handles requests offline or when Cloudflare Pages
@@ -37,10 +79,10 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
       query[k] = v;
     });
 
-    let bodyData: any = {};
+    let bodyData: ClientRequestBody = {};
     if (options?.body && typeof options.body === 'string') {
       try {
-        bodyData = JSON.parse(options.body);
+        bodyData = JSON.parse(options.body) as ClientRequestBody;
       } catch {}
     }
 
@@ -101,7 +143,7 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
       return jsonResponse(challengeData);
     }
     if (pathname === '/api/daily-challenge/submit' && method === 'POST') {
-      const result = submitFallbackDailyChallenge(bodyData);
+      const result = submitFallbackDailyChallenge(bodyData as any);
       return jsonResponse(result);
     }
 
@@ -157,14 +199,7 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
     // 7. /api/leaderboard
     if (pathname === '/api/leaderboard') {
       return jsonResponse({
-        leaderboard: [
-          { rank: 1, name: 'Ananya Sharma', score: 94.5, accuracy: 96, percentile: 99.8, avatar: 'AS' },
-          { rank: 2, name: 'Rohan Verma', score: 91.0, accuracy: 93, percentile: 99.2, avatar: 'RV' },
-          { rank: 3, name: 'Priya Patel', score: 88.75, accuracy: 91, percentile: 98.7, avatar: 'PP' },
-          { rank: 4, name: 'Amit Kumar', score: 86.25, accuracy: 89, percentile: 97.9, avatar: 'AK' },
-          { rank: 5, name: 'Sneha Roy', score: 84.5, accuracy: 88, percentile: 96.5, avatar: 'SR' },
-          { rank: 6, name: 'You', score: 78.5, accuracy: 84, percentile: 92.1, avatar: 'ME', isUser: true },
-        ],
+        leaderboard: FALLBACK_LEADERBOARD,
       });
     }
 
@@ -174,9 +209,9 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
       if (storedWrongs.length > 0) {
         return jsonResponse({ wrongQuestions: storedWrongs });
       }
-      const defaultWrongs = FALLBACK_QUESTIONS.slice(0, 6).map((q: any, idx: number) => {
-        const correctOpt = q.options?.find((o: any) => o.isCorrect) || q.options?.[0];
-        const wrongOpt = q.options?.find((o: any) => !o.isCorrect) || q.options?.[1] || correctOpt;
+      const defaultWrongs: WrongQuestionItem[] = (FALLBACK_QUESTIONS as FallbackQuestionItem[]).slice(0, 6).map((q: FallbackQuestionItem, idx: number) => {
+        const correctOpt = q.options?.find((o: QuestionOption) => o.isCorrect) || q.options?.[0];
+        const wrongOpt = q.options?.find((o: QuestionOption) => !o.isCorrect) || q.options?.[1] || correctOpt;
         return {
           questionId: q.id,
           questionText: q.questionText,
@@ -194,7 +229,7 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
           missCount: (idx % 3) + 1,
           lastAttemptDate: new Date(Date.now() - ((idx + 1) * 86400000)).toISOString(),
           lastTestTitle: 'All-India Prelims Live Mock',
-          options: (q.options || []).map((o: any) => ({
+          options: (q.options || []).map((o: QuestionOption) => ({
             optionKey: o.optionKey,
             optionText: o.optionText,
             isCorrect: Boolean(o.isCorrect),
@@ -206,31 +241,21 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
 
     if (pathname.startsWith('/api/analytics')) {
       return jsonResponse({
-        overview: {
-          testsAttempted: 14,
-          avgScore: 72.4,
-          avgAccuracy: 84.6,
-          totalTimeHours: 18.5,
-          percentile: 88.3,
-        },
-        weakAreas: [
-          { subject: 'Quantitative Aptitude', topic: 'Data Interpretation', accuracy: 52 },
-          { subject: 'Reasoning Ability', topic: 'Floor & Flat Puzzles', accuracy: 58 },
-          { subject: 'English Language', topic: 'Sentence Rearrangement', accuracy: 64 },
-        ],
+        overview: FALLBACK_ANALYTICS_OVERVIEW,
+        weakAreas: FALLBACK_ANALYTICS_WEAK_AREAS,
       });
     }
 
     // 9. /api/bookmarks
     if (pathname === '/api/bookmarks') {
-      const stored = JSON.parse(localStorage.getItem('abhi_bookmarks') || '[]');
+      const stored: BookmarkItem[] = JSON.parse(localStorage.getItem('abhi_bookmarks') || '[]');
       if (method === 'POST') {
-        const questionId = bodyData.questionId;
-        const exists = stored.some((b: any) => (b.questionId || b.id) === questionId);
+        const questionId = typeof bodyData.questionId === 'string' ? bodyData.questionId : '';
+        const exists = stored.some((b: BookmarkItem) => (b.questionId || b.id) === questionId);
         if (questionId && !exists) {
-          const q = FALLBACK_QUESTIONS.find((item) => item.id === questionId);
-          const correctOpt = q?.options?.find((o: any) => o.isCorrect) || q?.options?.[0];
-          const newBookmark = {
+          const q = (FALLBACK_QUESTIONS as FallbackQuestionItem[]).find((item) => item.id === questionId);
+          const correctOpt = q?.options?.find((o: QuestionOption) => o.isCorrect) || q?.options?.[0];
+          const newBookmark: BookmarkItem = {
             id: `bm_${questionId}`,
             questionId,
             questionText: q?.questionText || 'Revision Question',
@@ -253,21 +278,21 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
     }
     if (pathname.startsWith('/api/bookmarks/') && method === 'DELETE') {
       const id = pathname.replace('/api/bookmarks/', '');
-      const stored = JSON.parse(localStorage.getItem('abhi_bookmarks') || '[]');
-      const filtered = stored.filter((b: any) => b.id !== id && b.questionId !== id);
+      const stored: BookmarkItem[] = JSON.parse(localStorage.getItem('abhi_bookmarks') || '[]');
+      const filtered = stored.filter((b: BookmarkItem) => b.id !== id && b.questionId !== id);
       localStorage.setItem('abhi_bookmarks', JSON.stringify(filtered));
       return jsonResponse({ success: true, id, removed: true });
     }
 
     // 10. /api/dashboard
     if (pathname === '/api/dashboard') {
-      const history = JSON.parse(localStorage.getItem('abhi_test_history') || '[]');
+      const history: AttemptHistoryItem[] = JSON.parse(localStorage.getItem('abhi_test_history') || '[]');
       const testsAttempted = history.length;
-      const totalScore = history.reduce((acc: number, h: any) => acc + (h.score || 0), 0);
-      const totalAcc = history.reduce((acc: number, h: any) => acc + (h.accuracy || 0), 0);
+      const totalScore = history.reduce((acc: number, h: AttemptHistoryItem) => acc + (h.score || 0), 0);
+      const totalAcc = history.reduce((acc: number, h: AttemptHistoryItem) => acc + (h.accuracy || 0), 0);
       const avgScore = testsAttempted > 0 ? parseFloat((totalScore / testsAttempted).toFixed(1)) : 78.5;
       const avgAccuracy = testsAttempted > 0 ? parseFloat((totalAcc / testsAttempted).toFixed(1)) : 84.5;
-      const bestScore = testsAttempted > 0 ? Math.max(...history.map((h: any) => h.score || 0)) : 88.0;
+      const bestScore = testsAttempted > 0 ? Math.max(...history.map((h: AttemptHistoryItem) => h.score || 0)) : 88.0;
 
       return jsonResponse({
         summary: {
@@ -278,7 +303,7 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
           streak: 1,
         },
         trendData: history.length > 0
-          ? history.slice(0, 10).reverse().map((h: any, idx: number) => ({
+          ? history.slice(0, 10).reverse().map((h: AttemptHistoryItem, idx: number) => ({
               index: idx + 1,
               date: h.submittedAt ? new Date(h.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : `T${idx + 1}`,
               title: h.testTitle,
@@ -286,42 +311,10 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
               accuracy: h.accuracy,
               percentage: h.percentage,
             }))
-          : [
-              { index: 1, date: 'Prev', title: 'Diagnostic Drill', score: 72, accuracy: 80, percentage: 72 },
-              { index: 2, date: 'Recent', title: 'Speed Test', score: 78.5, accuracy: 84.5, percentage: 78.5 },
-            ],
-        weakSubjects: [
-          { subject: 'Quantitative Aptitude', accuracy: 56.4, totalQuestions: 25 },
-          { subject: 'Reasoning Ability', accuracy: 62.0, totalQuestions: 30 },
-        ],
-        recommendations: [
-          {
-            title: 'Focus Drill: Quantitative Aptitude',
-            reason: 'Your accuracy is currently 56.4% across 25 attempted questions.',
-            action: 'Practice Topics',
-            link: '/practice',
-          },
-          {
-            title: 'Attempt Full-Length Mock Test',
-            reason: 'Consistent timed pacing improves retention and sectional cutoffs.',
-            action: 'Browse Mock Tests',
-            link: '/mock-tests',
-          },
-        ],
-        recentTests: history.length > 0 ? history.slice(0, 5) : [
-          {
-            attemptId: 'att_de94ec9c-7468-42bd-8206-20edf41c9295_recent',
-            testId: 'de94ec9c-7468-42bd-8206-20edf41c9295',
-            title: 'SBI PO Prelims Full Mock 1',
-            examName: 'SBI PO',
-            score: 78.5,
-            totalMarks: 100,
-            percentage: 78.5,
-            accuracy: 84.5,
-            status: 'COMPLETED',
-            submittedAt: new Date().toISOString(),
-          },
-        ],
+          : FALLBACK_DASHBOARD_TREND,
+        weakSubjects: FALLBACK_DASHBOARD_WEAK_SUBJECTS,
+        recommendations: FALLBACK_DASHBOARD_RECOMMENDATIONS,
+        recentTests: history.length > 0 ? history.slice(0, 5) : FALLBACK_RECENT_TESTS,
         activeAttempt: null,
       });
     }
@@ -334,13 +327,8 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
     // 12. /api/gemini/personas & /api/gemini/chat
     if (pathname === '/api/gemini/personas') {
       return jsonResponse({
-        personas: [
-          { id: 'exam-mentor', name: 'Exam Mentor', description: 'Holistic strategy, timetables & section management' },
-          { id: 'quant-reasoning', name: 'Quant & Reasoning Master', description: 'Step-by-step proofs + 20-second shortcut tricks' },
-          { id: 'quick-doubts', name: 'Lightning Doubts', description: 'Rapid formula verification & quick answers' },
-          { id: 'question-explainer', name: 'Question Dissector', description: 'Option trap analysis & deep-dive solutions' },
-        ],
-        models: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'],
+        personas: FALLBACK_GEMINI_PERSONAS,
+        models: FALLBACK_GEMINI_MODELS,
       });
     }
 
@@ -378,13 +366,13 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
     // 14. /api/admin/*
     if (pathname === '/api/admin/stats') {
       return jsonResponse({
-        totalUsers: 148,
+        totalUsers: FALLBACK_ADMIN_STATS.totalUsers,
         totalTests: FALLBACK_TESTS.length,
         totalQuestions: FALLBACK_QUESTIONS.length,
-        totalAttempts: 1420,
-        averagePlatformScore: 72.8,
-        activeCandidates: 34,
-        recentSignups: 12,
+        totalAttempts: FALLBACK_ADMIN_STATS.totalAttempts,
+        averagePlatformScore: FALLBACK_ADMIN_STATS.averagePlatformScore,
+        activeCandidates: FALLBACK_ADMIN_STATS.activeCandidates,
+        recentSignups: FALLBACK_ADMIN_STATS.recentSignups,
       });
     }
     if (pathname === '/api/admin/tests') {
@@ -395,9 +383,7 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
     }
     if (pathname === '/api/admin/users') {
       return jsonResponse({
-        users: [
-          { id: 'u-1', name: 'Abhishek Kumar', email: 'abhishek@mocktest.com', role: 'ADMIN', createdAt: new Date().toISOString() },
-        ],
+        users: FALLBACK_ADMIN_USERS,
       });
     }
     if (pathname === '/api/admin/audit-logs') {
@@ -407,12 +393,12 @@ export function clientApiRouter(urlStr: string, options?: RequestInit): Response
     // Generic fallback for any other unhandled /api path
     return jsonResponse({ success: true, data: [] });
   } catch (err) {
-    console.error('clientApiRouter error:', err);
+    logger.error('clientApiRouter error:', err);
     return jsonResponse({ error: 'Internal fallback error' }, 500);
   }
 }
 
-function jsonResponse(data: any, status = 200): Response {
+function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, Link } from '../contexts/RouterContext';
 import { useAuth } from '../contexts/AuthContext';
+import { logger } from '../lib/logger';
 import {
   ShieldAlert,
   FolderKanban,
@@ -133,7 +134,7 @@ export const AdminPage: React.FC = () => {
           }
         }
       } catch (e) {
-        console.error(e);
+        logger.error(e);
       } finally {
         setLoading(false);
       }
@@ -263,7 +264,7 @@ export const AdminPage: React.FC = () => {
         setTests((prev) => prev.filter((t) => t.id !== testId));
       }
     } catch (e) {
-      console.error(e);
+      logger.error(e);
     }
   };
 
@@ -325,7 +326,7 @@ export const AdminPage: React.FC = () => {
         );
       }
     } catch (e) {
-      console.error(e);
+      logger.error(e);
     } finally {
       setUpdatingReportId(null);
     }

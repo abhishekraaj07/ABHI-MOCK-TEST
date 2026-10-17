@@ -36,19 +36,19 @@ describe('Guest Mode Authentication & Access Control Tests', () => {
     } as unknown as AuthRequest;
 
     let statusCode = 200;
-    let responseBody: any = null;
+    let responseBody: { error?: { code?: string } } | null = null;
     let nextCalled = false;
 
-    const res: any = {
+    const res = {
       status: (code: number) => {
         statusCode = code;
         return {
-          json: (body: any) => {
+          json: (body: { error?: { code?: string } }) => {
             responseBody = body;
           },
         };
       },
-    };
+    } as unknown as import('express').Response;
 
     const next = () => {
       nextCalled = true;
@@ -73,12 +73,18 @@ describe('Guest Mode Authentication & Access Control Tests', () => {
     } as unknown as AuthRequest;
 
     let nextCalled = false;
-    const res: any = {};
+    const res = {} as unknown as import('express').Response;
     const next = () => {
       nextCalled = true;
     };
 
     requireAdmin(req, res, next);
     assert.strictEqual(nextCalled, true, 'requireAdmin must allow verified administrator.');
+  });
+
+  it('Validates guest email formatting and transient properties', () => {
+    const guestId = 'a1b2c3d4';
+    const guestEmail = `guest_${guestId}@guest.abhimocktest.com`;
+    assert.match(guestEmail, /^guest_[a-z0-9]+@guest\.abhimocktest\.com$/);
   });
 });

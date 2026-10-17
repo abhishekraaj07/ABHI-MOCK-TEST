@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useRouter } from '../contexts/RouterContext';
 import { useAuth } from '../contexts/AuthContext';
-import { User, KeyRound, Shield, LogOut, CheckCircle2, AlertCircle } from 'lucide-react';
+import { User, KeyRound, Shield, LogOut, CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 export const ProfilePage: React.FC = () => {
   const { navigate } = useRouter();
@@ -14,6 +14,9 @@ export const ProfilePage: React.FC = () => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [updatingPassword, setUpdatingPassword] = useState(false);
   const [passwordMsg, setPasswordMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -64,8 +67,8 @@ export const ProfilePage: React.FC = () => {
       return;
     }
 
-    if (newPassword.length < 6) {
-      setPasswordMsg({ type: 'error', text: 'New password must be at least 6 characters long.' });
+    if (newPassword.length < 8) {
+      setPasswordMsg({ type: 'error', text: 'New password must be at least 8 characters long.' });
       return;
     }
 
@@ -98,8 +101,8 @@ export const ProfilePage: React.FC = () => {
       } else {
         setPasswordMsg({ type: 'error', text: json.error || 'Failed to update password.' });
       }
-    } catch (err: any) {
-      setPasswordMsg({ type: 'error', text: err.message || 'Network error.' });
+    } catch (err: unknown) {
+      setPasswordMsg({ type: 'error', text: err instanceof Error ? err.message : 'Network error.' });
     } finally {
       setUpdatingPassword(false);
     }
@@ -179,35 +182,68 @@ export const ProfilePage: React.FC = () => {
           <div className="space-y-3 max-w-md">
             <div className="space-y-1">
               <label className="text-xs font-medium opacity-80">Current Password</label>
-              <input
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                required
-                className="w-full rounded border border-[var(--line)] bg-[var(--paper)] px-3 py-2 text-xs text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
-              />
+              <div className="relative flex items-center">
+                <input
+                  type={showCurrentPassword ? 'text' : 'password'}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  required
+                  className="w-full rounded border border-[var(--line)] bg-[var(--paper)] px-3 py-2 pr-10 text-xs text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPassword((prev) => !prev)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--ink)] opacity-70 hover:opacity-100 transition-opacity p-1 cursor-pointer z-10"
+                  aria-label={showCurrentPassword ? 'Hide current password' : 'Show current password'}
+                  tabIndex={0}
+                >
+                  {showCurrentPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-medium opacity-80">New Password (min. 6 chars)</label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                required
-                className="w-full rounded border border-[var(--line)] bg-[var(--paper)] px-3 py-2 text-xs text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
-              />
+              <label className="text-xs font-medium opacity-80">New Password (min. 8 characters)</label>
+              <div className="relative flex items-center">
+                <input
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  className="w-full rounded border border-[var(--line)] bg-[var(--paper)] px-3 py-2 pr-10 text-xs text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword((prev) => !prev)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--ink)] opacity-70 hover:opacity-100 transition-opacity p-1 cursor-pointer z-10"
+                  aria-label={showNewPassword ? 'Hide new password' : 'Show new password'}
+                  tabIndex={0}
+                >
+                  {showNewPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-1">
               <label className="text-xs font-medium opacity-80">Confirm New Password</label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                className="w-full rounded border border-[var(--line)] bg-[var(--paper)] px-3 py-2 text-xs text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
-              />
+              <div className="relative flex items-center">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  className="w-full rounded border border-[var(--line)] bg-[var(--paper)] px-3 py-2 pr-10 text-xs text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--ink)] opacity-70 hover:opacity-100 transition-opacity p-1 cursor-pointer z-10"
+                  aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                  tabIndex={0}
+                >
+                  {showConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
             </div>
           </div>
 

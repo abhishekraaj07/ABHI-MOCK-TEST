@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { logger } from '../lib/logger';
 
 interface ExamOption {
   id: string;
@@ -53,7 +54,7 @@ export const CustomTestBuilderPage: React.FC = () => {
           }
         }
       } catch (e) {
-        console.error('Failed to load exams list:', e);
+        logger.error('Failed to load exams list:', e);
       } finally {
         setLoadingExams(false);
       }
@@ -108,8 +109,8 @@ export const CustomTestBuilderPage: React.FC = () => {
 
       // Navigate to instructions of newly created test
       navigate(`/tests/${data.testId}/instructions`);
-    } catch (err: any) {
-      setError(err.message || 'An error occurred while creating custom test.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred while creating custom test.');
       setCreating(false);
     }
   };

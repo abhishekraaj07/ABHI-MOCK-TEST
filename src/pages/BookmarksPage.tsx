@@ -13,13 +13,15 @@ import {
 import { QuestionReportModal } from '../components/QuestionReportModal';
 import { useAuth } from '../contexts/AuthContext';
 import { apiFetch } from '../lib/api';
+import { logger } from '../lib/logger';
+import { BookmarkItem, QuestionOption } from '../types';
 
 export const BookmarksPage: React.FC = () => {
   const { navigate } = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const [bookmarks, setBookmarks] = useState<any[]>([]);
+  const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [reportingQuestion, setReportingQuestion] = useState<any | null>(null);
+  const [reportingQuestion, setReportingQuestion] = useState<BookmarkItem | null>(null);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -44,7 +46,7 @@ export const BookmarksPage: React.FC = () => {
           credentials: 'include',
         });
 
-        let bookmarkList = [];
+        let bookmarkList: BookmarkItem[] = [];
         if (res.ok) {
           try {
             const json = await res.json();
@@ -54,18 +56,18 @@ export const BookmarksPage: React.FC = () => {
 
         // Merge locally flagged bookmarks
         try {
-          const localBms = JSON.parse(localStorage.getItem('abhi_bookmarks') || '[]');
+          const localBms: BookmarkItem[] = JSON.parse(localStorage.getItem('abhi_bookmarks') || '[]');
           if (Array.isArray(localBms) && localBms.length > 0) {
-            const localIds = new Set(localBms.map((b: any) => b.questionId || b.id));
-            bookmarkList = [...localBms, ...bookmarkList.filter((b: any) => !localIds.has(b.questionId || b.id))];
+            const localIds = new Set(localBms.map((b: BookmarkItem) => b.questionId || b.id));
+            bookmarkList = [...localBms, ...bookmarkList.filter((b: BookmarkItem) => !localIds.has(b.questionId || b.id))];
           }
         } catch {}
 
         setBookmarks(bookmarkList);
       } catch (e) {
-        console.error(e);
+        logger.error(e);
         try {
-          const localBms = JSON.parse(localStorage.getItem('abhi_bookmarks') || '[]');
+          const localBms: BookmarkItem[] = JSON.parse(localStorage.getItem('abhi_bookmarks') || '[]');
           if (Array.isArray(localBms) && localBms.length > 0) {
             setBookmarks(localBms);
           }
@@ -91,12 +93,12 @@ export const BookmarksPage: React.FC = () => {
       setBookmarks((prev) => prev.filter((b) => b.id !== id && b.questionId !== id));
 
       try {
-        const stored = JSON.parse(localStorage.getItem('abhi_bookmarks') || '[]');
-        const updated = stored.filter((b: any) => b.id !== id && b.questionId !== id);
+        const stored: BookmarkItem[] = JSON.parse(localStorage.getItem('abhi_bookmarks') || '[]');
+        const updated = stored.filter((b: BookmarkItem) => b.id !== id && b.questionId !== id);
         localStorage.setItem('abhi_bookmarks', JSON.stringify(updated));
       } catch {}
     } catch (e) {
-      console.error(e);
+      logger.error(e);
     }
   };
 
@@ -308,7 +310,7 @@ export const BookmarksPage: React.FC = () => {
 
               {/* Options */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
-                {b.options.map((opt: any) => (
+                {(b.options || []).map((opt: QuestionOption) => (
                   <div
                     key={opt.optionKey}
                     className={`p-2.5 rounded border flex items-center justify-between ${

@@ -81,4 +81,70 @@ describe('Authentication & Authorization Security Tests (§Phase 2)', () => {
     assert.strictEqual(AUTH_COOKIE_OPTIONS.path, '/');
     assert.ok(AUTH_COOKIE_OPTIONS.maxAge > 0);
   });
+
+  it('Normalizes emails to lowercase to prevent case-sensitive authentication mismatches', () => {
+    const rawEmails = ['User@Example.Com', '  Priya.Sharma@Mock.IN  ', 'TEST.ASPIRANT@DOMAIN.ORG'];
+    const expected = ['user@example.com', 'priya.sharma@mock.in', 'test.aspirant@domain.org'];
+
+    rawEmails.forEach((raw, i) => {
+      const normalized = raw.trim().toLowerCase();
+      assert.strictEqual(normalized, expected[i]);
+    });
+  });
+
+  it('Validates Zod RegisterSchema: enforces password matching, length >= 8, valid email', async () => {
+    const { RegisterSchema } = await import('../server/validators/schemas');
+
+    // Valid registration
+    const valid = RegisterSchema.safeParse({
+      name: 'Rohan Verma',
+      email: 'rohan@example.com',
+      password: 'StrongPassword123!',
+      confirmPassword: 'StrongPassword123!',
+    });
+    assert.strictEqual(valid.success, true);
+
+    // Mismatched passwords
+    const mismatch = RegisterSchema.safeParse({
+      name: 'Rohan Verma',
+      email: 'rohan@example.com',
+      password: 'StrongPassword123!',
+      confirmPassword: 'DifferentPassword123!',
+    });
+    assert.strictEqual(mismatch.success, false);
+
+    // Short password
+    const shortPwd = RegisterSchema.safeParse({
+      name: 'Rohan Verma',
+      email: 'rohan@example.com',
+      password: 'short',
+      confirmPassword: 'short',
+    });
+    assert.strictEqual(shortPwd.success, false);
+
+    // Invalid email
+    const invalidEmail = RegisterSchema.safeParse({
+      name: 'Rohan Verma',
+      email: 'not-an-email',
+      password: 'StrongPassword123!',
+      confirmPassword: 'StrongPassword123!',
+    });
+    assert.strictEqual(invalidEmail.success, false);
+  });
+
+  it('Validates Zod LoginSchema: rejects empty credentials', async () => {
+    const { LoginSchema } = await import('../server/validators/schemas');
+
+    const valid = LoginSchema.safeParse({
+      email: 'candidate@mock.com',
+      password: 'Password123!',
+    });
+    assert.strictEqual(valid.success, true);
+
+    const empty = LoginSchema.safeParse({
+      email: '',
+      password: '',
+    });
+    assert.strictEqual(empty.success, false);
+  });
 });

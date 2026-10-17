@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, Link } from '../contexts/RouterContext';
-import { ExamDetail, TestSummary } from '../types';
+import { ExamDetail, SubjectDetail, TestSummary } from '../types';
 import { HelpCircle, ChevronRight, Lock, ArrowLeft } from 'lucide-react';
 import { apiFetch } from '../lib/api';
+import { logger } from '../lib/logger';
 
 class ExamDetailErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -18,7 +19,7 @@ class ExamDetailErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('ExamDetail boundary caught error:', error, errorInfo);
+    logger.error('ExamDetail boundary caught error:', error, errorInfo);
   }
 
   render() {
@@ -73,7 +74,7 @@ const ExamDetailInner: React.FC<{ examSlugOrId?: string; slug?: string }> = ({ e
           setData(json.exam);
         }
       } catch (e) {
-        console.warn('Error fetching exam detail:', e);
+        logger.warn('Error fetching exam detail:', e);
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -116,7 +117,7 @@ const ExamDetailInner: React.FC<{ examSlugOrId?: string; slug?: string }> = ({ e
   };
 
   // Safely normalize subjects whether they are strings or detailed objects
-  const normalizedSubjects = (data.subjects || []).map((sub: any, idx: number) => {
+  const normalizedSubjects = (data.subjects || []).map((sub: string | Partial<SubjectDetail>, idx: number) => {
     if (typeof sub === 'string') {
       return {
         id: `sub-${idx + 1}`,

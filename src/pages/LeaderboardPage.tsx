@@ -3,13 +3,15 @@ import { useRouter } from '../contexts/RouterContext';
 import { Award, Trophy, Medal } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { FALLBACK_EXAMS } from '../lib/fallbackData';
+import { logger } from '../lib/logger';
+import { Exam, LeaderboardEntry } from '../types';
 
 export const LeaderboardPage: React.FC = () => {
-  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<string>('All-Time');
   const [exam, setExam] = useState<string>('All');
-  const [examsList, setExamsList] = useState<any[]>(FALLBACK_EXAMS);
+  const [examsList, setExamsList] = useState<Exam[]>(FALLBACK_EXAMS);
 
   useEffect(() => {
     let isMounted = true;
@@ -45,7 +47,7 @@ export const LeaderboardPage: React.FC = () => {
           setLeaderboard(json.leaderboard || []);
         }
       } catch (e) {
-        console.warn('Leaderboard fetch deferred:', e);
+        logger.warn('Leaderboard fetch deferred:', e);
       } finally {
         if (isMounted) {
           setLoading(false);

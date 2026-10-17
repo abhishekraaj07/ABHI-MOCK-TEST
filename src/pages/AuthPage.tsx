@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useRouter, Link } from '../contexts/RouterContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Wordmark } from '../components/Wordmark';
-import { Lock, Mail, User, ShieldCheck, UserCheck, Sparkles, LogIn } from 'lucide-react';
+import { isFirebaseConfigured } from '../lib/firebase';
+import { Lock, Mail, User, ShieldCheck, UserCheck, Sparkles, LogIn, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 
 export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => {
   const { navigate, queryParams } = useRouter();
@@ -15,6 +16,8 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [guestSubmitting, setGuestSubmitting] = useState(false);
@@ -58,6 +61,24 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    // Client-side instant validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    if (!isLogin && password.length < 8) {
+      setError('Password must be at least 8 characters long.');
+      return;
+    }
+
+    if (!isLogin && password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
     setSubmitting(true);
 
     if (isLogin) {
@@ -66,20 +87,15 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
       if (res.success) {
         navigate(redirectTarget);
       } else {
-        setError(res.error || 'Invalid credentials');
+        setError(res.error || 'Invalid email or password.');
       }
     } else {
-      if (password !== confirmPassword) {
-        setSubmitting(false);
-        setError('Passwords do not match');
-        return;
-      }
       const res = await register(name, email, password, confirmPassword);
       setSubmitting(false);
       if (res.success) {
         navigate(redirectTarget);
       } else {
-        setError(res.error || 'Registration failed');
+        setError(res.error || 'Registration failed. Please try again.');
       }
     }
   };
@@ -165,6 +181,19 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
               </svg>
               <span>{googleSubmitting ? 'Authenticating with Google...' : 'Continue with Google'}</span>
             </button>
+            {!isFirebaseConfigured && (
+              <p className="mt-1.5 text-center text-[11px] text-[var(--ink)] opacity-60">
+                Google Sign-In requires Firebase configuration. Use{' '}
+                <button
+                  type="button"
+                  onClick={handleGuestLogin}
+                  className="font-semibold underline hover:text-[var(--accent)] cursor-pointer"
+                >
+                  Guest Mode
+                </button>{' '}
+                or Email below for instant access.
+              </p>
+            )}
 
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
@@ -179,12 +208,17 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-[var(--ink)] opacity-80">Full Name</label>
+                <label htmlFor="auth-name-input" className="text-xs font-semibold text-[var(--ink)] opacity-80">Full Name</label>
                 <div className="relative">
-                  <User size={15} className="absolute left-3 top-3 opacity-40" />
+                  <User size={15} className="absolute left-3 top-3 opacity-40 pointer-events-none" />
                   <input
+                    id="auth-name-input"
+                    name="name"
                     type="text"
                     required
+                    autoComplete="name"
+                    aria-label="Full Name"
+                    aria-required="true"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g. Priya Sharma"
@@ -195,12 +229,17 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
             )}
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-[var(--ink)] opacity-80">Email Address</label>
+              <label htmlFor="auth-email-input" className="text-xs font-semibold text-[var(--ink)] opacity-80">Email Address</label>
               <div className="relative">
-                <Mail size={15} className="absolute left-3 top-3 opacity-40" />
+                <Mail size={15} className="absolute left-3 top-3 opacity-40 pointer-events-none" />
                 <input
+                  id="auth-email-input"
+                  name="email"
                   type="email"
                   required
+                  autoComplete="email"
+                  aria-label="Email Address"
+                  aria-required="true"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@domain.com"
@@ -210,42 +249,82 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-[var(--ink)] opacity-80">Password</label>
-              <div className="relative">
-                <Lock size={15} className="absolute left-3 top-3 opacity-40" />
+              <div className="flex items-center justify-between">
+                <label htmlFor="auth-password-input" className="text-xs font-semibold text-[var(--ink)] opacity-80">Password</label>
+                {!isLogin && (
+                  <span className={`text-[10px] font-medium flex items-center gap-1 ${password.length >= 8 ? 'text-emerald-500' : 'text-[var(--ink)] opacity-50'}`}>
+                    <CheckCircle2 size={11} className={password.length >= 8 ? 'opacity-100' : 'opacity-30'} />
+                    Min 8 characters
+                  </span>
+                )}
+              </div>
+              <div className="relative flex items-center">
+                <Lock size={15} className="absolute left-3 opacity-50 pointer-events-none text-[var(--ink)]" />
                 <input
-                  type="password"
+                  id="auth-password-input"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
+                  autoComplete={isLogin ? 'current-password' : 'new-password'}
+                  aria-label="Password"
+                  aria-required="true"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full rounded border border-[var(--line)] bg-[var(--paper)] pl-9 pr-3 py-2 text-xs text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
+                  className="w-full rounded border border-[var(--line)] bg-[var(--paper)] pl-9 pr-10 py-2.5 text-xs text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none transition-colors"
                 />
+                <button
+                  type="button"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-[var(--ink)] opacity-70 hover:opacity-100 hover:bg-[var(--line)]/50 focus:outline-none focus:ring-1 focus:ring-[var(--accent)] transition-all cursor-pointer z-10"
+                >
+                  {showPassword ? <EyeOff size={15} className="text-[var(--accent)]" /> : <Eye size={15} />}
+                </button>
               </div>
             </div>
 
             {!isLogin && (
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-[var(--ink)] opacity-80">
+                <label htmlFor="auth-confirm-password-input" className="text-xs font-semibold text-[var(--ink)] opacity-80">
                   Confirm Password
                 </label>
-                <div className="relative">
-                  <Lock size={15} className="absolute left-3 top-3 opacity-40" />
+                <div className="relative flex items-center">
+                  <Lock size={15} className="absolute left-3 opacity-50 pointer-events-none text-[var(--ink)]" />
                   <input
-                    type="password"
+                    id="auth-confirm-password-input"
+                    name="confirmPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
                     required
+                    autoComplete="new-password"
+                    aria-label="Confirm Password"
+                    aria-required="true"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full rounded border border-[var(--line)] bg-[var(--paper)] pl-9 pr-3 py-2 text-xs text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
+                    className="w-full rounded border border-[var(--line)] bg-[var(--paper)] pl-9 pr-10 py-2.5 text-xs text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none transition-colors"
                   />
+                  <button
+                    type="button"
+                    aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                    title={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-[var(--ink)] opacity-70 hover:opacity-100 hover:bg-[var(--line)]/50 focus:outline-none focus:ring-1 focus:ring-[var(--accent)] transition-all cursor-pointer z-10"
+                  >
+                    {showConfirmPassword ? <EyeOff size={15} className="text-[var(--accent)]" /> : <Eye size={15} />}
+                  </button>
                 </div>
               </div>
             )}
 
             {error && (
-              <div className="rounded border border-red-300 dark:border-red-900 bg-red-50 dark:bg-red-950/40 p-3 text-xs text-red-700 dark:text-red-300">
-                {error}
+              <div
+                role="alert"
+                aria-live="polite"
+                className="rounded border border-red-300 dark:border-red-900 bg-red-50 dark:bg-red-950/40 p-3 text-xs text-red-700 dark:text-red-300 flex items-start gap-2"
+              >
+                <span>{error}</span>
               </div>
             )}
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Markdown from 'react-markdown';
 import { useAuth } from '../contexts/AuthContext';
 import { persistChatMessageToFirestore } from '../lib/firebase';
+import { logger } from '../lib/logger';
 import {
   Sparkles,
   Send,
@@ -17,6 +18,7 @@ import {
   Info,
   Maximize2,
   Minimize2,
+  LucideIcon,
 } from 'lucide-react';
 
 export interface ChatMessage {
@@ -37,7 +39,7 @@ export interface PersonaConfig {
   id: string;
   name: string;
   roleTitle: string;
-  icon: any;
+  icon: LucideIcon;
   defaultModel: SupportedModelId;
   description: string;
   samplePrompts: string[];
@@ -243,8 +245,8 @@ export const GeminiChatbot: React.FC<GeminiChatbotProps> = ({
       if (user?.id) {
         persistChatMessageToFirestore(user.id, chatId, modelMessage);
       }
-    } catch (err: any) {
-      console.warn('Chat network notice, activating pedagogical engine:', err);
+    } catch (err: unknown) {
+      logger.warn('Chat network notice, activating pedagogical engine:', err);
       const fallbackAdvice: ChatMessage = {
         id: `msg_model_${Date.now()}`,
         role: 'model',

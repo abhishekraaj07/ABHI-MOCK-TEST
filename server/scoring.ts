@@ -113,3 +113,16 @@ export function scoreItemizedQuestions(
     totalQuestions: items.length,
   };
 }
+
+/**
+ * Calculates cohort percentile rank (§9 & Results analytics):
+ * Percentage of cohort test-takers whose score is strictly less than targetScore.
+ * If cohort is empty or single candidate, returns 100.0%.
+ */
+export function calculatePercentile(targetScore: number, cohortScores: number[]): number {
+  if (!Array.isArray(cohortScores) || cohortScores.length <= 1) {
+    return 100.0;
+  }
+  const belowCount = cohortScores.filter((score) => typeof score === 'number' && score < targetScore).length;
+  return parseFloat(((belowCount / (cohortScores.length - 1)) * 100).toFixed(1));
+}

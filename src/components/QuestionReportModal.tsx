@@ -79,8 +79,8 @@ export const QuestionReportModal: React.FC<QuestionReportModalProps> = ({
         setDescription('');
         onClose();
       }, 1800);
-    } catch (err: any) {
-      setError(err.message || 'An error occurred while submitting.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred while submitting.');
     } finally {
       setSubmitting(false);
     }
