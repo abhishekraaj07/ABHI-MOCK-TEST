@@ -18,6 +18,21 @@ const dbData = dbDataRaw as {
 
 export const FALLBACK_EXAMS: Exam[] = [
   {
+    id: 'rrb-ntpc-ug-2026',
+    name: 'RRB NTPC (UG) 2026',
+    slug: 'rrb-ntpc-ug',
+    category: 'Railways',
+    difficulty: 'Moderate',
+    description: 'Railway Recruitment Boards CEN No. 07/2026 Non-Technical Popular Categories (Under Graduate) official exam pattern with 100-question CBT-1 master simulations, 1/3rd negative marking, and sectional speed drills.',
+    subjects: [
+      'General Awareness & Railways GK',
+      'Mathematics (Arithmetic & Advanced)',
+      'General Intelligence & Reasoning',
+    ],
+    testCount: 5,
+    questionCount: 100,
+  },
+  {
     id: 'bca-5th-sem-ccsu',
     name: 'BCA 5th Semester (CCSU)',
     slug: 'bca-5th-sem',

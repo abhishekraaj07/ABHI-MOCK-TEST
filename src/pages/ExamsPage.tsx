@@ -47,7 +47,7 @@ export const ExamsPage: React.FC = () => {
     };
   }, [search, category, difficulty]);
 
-  const categories = ['All', 'Banking', 'SSC', 'Regulatory'];
+  const categories = ['All', 'Railways', 'Banking', 'SSC', 'University Degree', 'Regulatory'];
   const difficulties = ['All', 'Easy', 'Moderate', 'Hard'];
 
   return (

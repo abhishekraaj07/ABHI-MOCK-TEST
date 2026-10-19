@@ -181,11 +181,19 @@ export const LandingPage: React.FC = () => {
                 Full-fidelity test simulations, server-authoritative countdown timers, and detailed analytics engineered for BCA Semester Exams and All Competitive Aspirants.
               </p>
 
-              <div className="flex flex-wrap items-center gap-4 pt-2">
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <Link
+                  href="/exams/rrb-ntpc-ug"
+                  id="hero-cta-rrb-ntpc"
+                  className="rounded bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm inline-flex items-center gap-2"
+                >
+                  <span>🚂</span> Start RRB NTPC 2026 Mock
+                </Link>
+
                 <Link
                   href="/exams/bca-5th-sem"
                   id="hero-cta-free-test"
-                  className="rounded bg-[var(--accent)] px-6 py-3 text-sm font-semibold text-white hover:bg-[var(--accent-hover)] transition-colors shadow-sm"
+                  className="rounded bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white hover:bg-[var(--accent-hover)] transition-colors shadow-sm"
                 >
                   Start BCA 5th Sem Mock
                 </Link>
@@ -193,7 +201,7 @@ export const LandingPage: React.FC = () => {
                 <Link
                   href="/exams"
                   id="hero-cta-explore-exams"
-                  className="rounded border border-[var(--line)] bg-[var(--surface)] px-6 py-3 text-sm font-semibold text-[var(--ink)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors"
+                  className="rounded border border-[var(--line)] bg-[var(--surface)] px-5 py-3 text-sm font-semibold text-[var(--ink)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors"
                 >
                   Explore Target Exams
                 </Link>
