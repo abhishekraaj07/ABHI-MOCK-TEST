@@ -3,7 +3,7 @@ import '../styles/heroAnimation.css';
 import { Link } from '../contexts/RouterContext';
 import { Exam } from '../types';
 import { PaletteLegend } from '../components/PaletteLegend';
-import { Clock, CheckCircle2, Shield, BarChart3, ArrowRight, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Clock, CheckCircle2, Shield, BarChart3, ArrowRight, ChevronRight, ChevronLeft, Layers, Sparkles } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { FALLBACK_EXAMS, FALLBACK_STATS } from '../lib/fallbackData';
 import { logger } from '../lib/logger';
@@ -18,6 +18,8 @@ export const LandingPage: React.FC = () => {
     availabilityRate: string;
   }>(FALLBACK_STATS);
   const [loading, setLoading] = useState(false);
+  const [selectedExamCategory, setSelectedExamCategory] = useState<string>('All');
+  const [showAllInLanding, setShowAllInLanding] = useState<boolean>(false);
 
   // Demo interactive widget state in Hero section (§4)
   // Starts directly on Question 11 (index 10) so candidate immediately sees Question 11 of 25
@@ -465,76 +467,189 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* 3. POPULAR EXAMS GRID */}
+      {/* 3. TARGET EXAMINATION SERIES — Clutter-Free Category Filtered (§4) */}
       <section className="border-b border-[var(--line)] bg-[var(--surface)] py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-4">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--accent)] mb-1">
+                <Sparkles size={14} /> Streamlined Exam Portals
+              </div>
               <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-[var(--ink)]">
                 Target Examination Series
               </h2>
-              <p className="text-sm text-[var(--ink)] opacity-70 font-sans mt-1">
-                Select your targeted exam pattern to access curated syllabus-specific question sets.
+              <p className="text-sm text-[var(--ink)] opacity-70 font-sans mt-1 max-w-2xl">
+                Choose your specific target domain to view organized mock tests and syllabus roadmaps without visual clutter.
               </p>
             </div>
             <Link
               href="/exams"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent)] hover:underline"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent)] hover:underline whitespace-nowrap"
             >
-              View all exams <ArrowRight size={14} />
+              Explore Full Catalog <ArrowRight size={14} />
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {exams.map((exam) => (
-              <div
-                key={exam.id}
-                className="flex flex-col justify-between rounded border border-[var(--line)] bg-[var(--paper)] p-6 hover:border-[var(--accent)] transition-colors"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="rounded bg-[var(--surface)] border border-[var(--line)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--accent)]">
-                      {exam.category}
-                    </span>
-                    <span className="text-[11px] font-mono text-[var(--ink)] opacity-60">
-                      Difficulty: {exam.difficulty}
-                    </span>
-                  </div>
-
-                  <h3 className="text-xl font-bold text-[var(--ink)] font-serif">
-                    {exam.name}
-                  </h3>
-
-                  <p className="text-xs text-[var(--ink)] opacity-75 line-clamp-2 leading-relaxed">
-                    {exam.description}
-                  </p>
-
-                  <div className="flex flex-wrap gap-1.5 pt-2">
-                    {exam.subjects.map((sub) => (
-                      <span
-                        key={sub}
-                        className="rounded bg-[var(--surface)] border border-[var(--line)] px-2 py-0.5 text-[10px] text-[var(--ink)] opacity-80"
-                      >
-                        {sub}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="border-t border-[var(--line)] pt-4 mt-6 flex items-center justify-between text-xs">
-                  <span className="font-mono text-[var(--ink)] opacity-70">
-                    {exam.testCount} Mock Tests
-                  </span>
-                  <Link
-                    href={`/exams/${exam.slug}`}
-                    className="font-semibold text-[var(--accent)] hover:underline"
+          {/* Interactive Category Selector Tabs */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] pb-4 pt-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                { id: 'All', label: 'All Streams', icon: '🌟' },
+                { id: 'Railways', label: 'Railways', icon: '🚂' },
+                { id: 'University Degree', label: 'University Degree', icon: '🎓' },
+                { id: 'Banking', label: 'Banking & Insurance', icon: '🏦' },
+                { id: 'SSC', label: 'SSC Exams', icon: '🏛️' },
+                { id: 'Regulatory', label: 'Regulatory Bodies', icon: '⚖️' },
+              ].map((cat) => {
+                const count = cat.id === 'All' ? exams.length : exams.filter((e) => e.category === cat.id).length;
+                const isSelected = selectedExamCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => {
+                      setSelectedExamCategory(cat.id);
+                      setShowAllInLanding(false);
+                    }}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                      isSelected
+                        ? 'border-[var(--accent)] bg-[var(--accent)] text-white shadow-xs'
+                        : 'border-[var(--line)] bg-[var(--paper)] text-[var(--ink)] opacity-75 hover:opacity-100 hover:border-gray-400'
+                    }`}
                   >
-                    View Tests →
-                  </Link>
+                    <span>{cat.icon}</span>
+                    <span>{cat.label}</span>
+                    <span className={`ml-0.5 rounded-full px-1.5 py-0.2 text-[10px] font-mono ${
+                      isSelected ? 'bg-white/20 text-white' : 'bg-[var(--surface)] text-[var(--ink)] opacity-70'
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Quick Toggle between Balanced Stream View vs Show All */}
+            {selectedExamCategory === 'All' && (
+              <button
+                onClick={() => setShowAllInLanding((prev) => !prev)}
+                className="inline-flex items-center gap-1.5 text-xs text-[var(--ink)] opacity-70 hover:opacity-100 hover:text-[var(--accent)] font-medium cursor-pointer"
+              >
+                <span>{showAllInLanding ? 'Showing All 8 Exams' : 'Showing 1 Exam per Category (Balanced)'}</span>
+                <span className="font-semibold text-[var(--accent)] underline ml-1">
+                  {showAllInLanding ? 'Show Balanced' : 'Expand All'}
+                </span>
+              </button>
+            )}
+          </div>
+
+          {/* Contextual Banner when Banking is Selected */}
+          {selectedExamCategory === 'Banking' && (
+            <div className="rounded-lg border border-amber-300 dark:border-amber-900 bg-amber-50/70 dark:bg-amber-950/20 p-4 text-xs text-[var(--ink)] flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🏦</span>
+                <div>
+                  <div className="font-bold text-sm">Banking & Financial Recruitment Hub</div>
+                  <div className="opacity-75">
+                    SBI PO, IBPS PO, RRB PO & SBI Clerk with official 20-minute sectional timers, negative marking, and cutoff tracking.
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
+              <button
+                onClick={() => setSelectedExamCategory('All')}
+                className="text-xs font-semibold text-[var(--accent)] hover:underline whitespace-nowrap cursor-pointer"
+              >
+                Back to All Streams
+              </button>
+            </div>
+          )}
+
+          {/* Exams Grid */}
+          {(() => {
+            let displayedExams = exams;
+            if (selectedExamCategory !== 'All') {
+              displayedExams = exams.filter((e) => e.category === selectedExamCategory);
+            } else if (!showAllInLanding) {
+              // Balanced clean stream view: 1 representative from each category
+              const cats = ['Railways', 'University Degree', 'Banking', 'SSC', 'Regulatory'];
+              displayedExams = [];
+              for (const c of cats) {
+                const found = exams.find((e) => e.category === c);
+                if (found) displayedExams.push(found);
+              }
+            }
+
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {displayedExams.map((exam) => {
+                  const isBanking = exam.category === 'Banking';
+                  const bankingCount = exams.filter((e) => e.category === 'Banking').length;
+
+                  return (
+                    <div
+                      key={exam.id}
+                      className="flex flex-col justify-between rounded border border-[var(--line)] bg-[var(--paper)] p-6 hover:border-[var(--accent)] transition-all hover:shadow-xs group"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="rounded bg-[var(--surface)] border border-[var(--line)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--accent)]">
+                            {exam.category}
+                          </span>
+                          <span className="text-[11px] font-mono text-[var(--ink)] opacity-60">
+                            Difficulty: {exam.difficulty}
+                          </span>
+                        </div>
+
+                        <h3 className="text-xl font-bold text-[var(--ink)] font-serif group-hover:text-[var(--accent)] transition-colors">
+                          {exam.name}
+                        </h3>
+
+                        <p className="text-xs text-[var(--ink)] opacity-75 line-clamp-2 leading-relaxed">
+                          {exam.description}
+                        </p>
+
+                        <div className="flex flex-wrap gap-1.5 pt-2">
+                          {exam.subjects.map((sub) => (
+                            <span
+                              key={sub}
+                              className="rounded bg-[var(--surface)] border border-[var(--line)] px-2 py-0.5 text-[10px] text-[var(--ink)] opacity-80"
+                            >
+                              {sub}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* If in All Streams mode and this is Banking, show +3 More Banking Exams option */}
+                        {selectedExamCategory === 'All' && !showAllInLanding && isBanking && (
+                          <div className="pt-2">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedExamCategory('Banking')}
+                              className="w-full text-left rounded border border-dashed border-amber-300 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20 px-2.5 py-1.5 text-[11px] font-medium text-amber-800 dark:text-amber-300 hover:bg-amber-100/60 transition-colors flex items-center justify-between cursor-pointer"
+                            >
+                              <span>+{bankingCount - 1} More Banking Exams (IBPS PO, SBI Clerk...)</span>
+                              <span className="font-bold underline text-[10px]">Filter Banking →</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="border-t border-[var(--line)] pt-4 mt-6 flex items-center justify-between text-xs">
+                        <span className="font-mono text-[var(--ink)] opacity-70">
+                          {exam.testCount} Mock Tests
+                        </span>
+                        <Link
+                          href={`/exams/${exam.slug}`}
+                          className="font-semibold text-[var(--accent)] hover:underline flex items-center gap-1"
+                        >
+                          View Tests →
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       </section>
 

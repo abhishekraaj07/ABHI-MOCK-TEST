@@ -18,9 +18,8 @@ export const MockTestsPage: React.FC = () => {
   const [selectedExam, setSelectedExam] = useState<string>(initialExam);
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('All');
 
-  const [examsList, setExamsList] = useState<{ id: string; name: string; slug: string }[]>(
-    FALLBACK_EXAMS.map((e) => ({ id: e.id, name: e.name, slug: e.slug }))
-  );
+  const [examsList, setExamsList] = useState<any[]>(FALLBACK_EXAMS);
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
   // Sync query parameters when navigating
   useEffect(() => {
@@ -147,19 +146,49 @@ export const MockTestsPage: React.FC = () => {
 
         {/* Dropdowns */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
+          {/* Category Filter */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold uppercase opacity-60">Stream:</span>
+            <select
+              value={selectedCategory}
+              onChange={(e) => {
+                setSelectedCategory(e.target.value);
+                setSelectedExam('All');
+              }}
+              className="rounded border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none font-medium"
+            >
+              <option value="All">All Streams (🌟)</option>
+              <option value="Railways">🚂 Railways (RRB NTPC)</option>
+              <option value="University Degree">🎓 University (CCSU BCA)</option>
+              <option value="Banking">🏦 Banking & Insurance</option>
+              <option value="SSC">🏛️ SSC Exams</option>
+              <option value="Regulatory">⚖️ Regulatory Bodies</option>
+            </select>
+          </div>
+
+          {/* Exam Filter with Category Optgroups */}
+          <div className="flex items-center gap-1.5">
             <span className="text-xs font-semibold uppercase opacity-60">Exam:</span>
             <select
               value={selectedExam}
               onChange={(e) => setSelectedExam(e.target.value)}
               className="rounded border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
             >
-              <option value="All">All Exams</option>
-              {examsList.map((ex) => (
-                <option key={ex.id} value={ex.id}>
-                  {ex.name}
-                </option>
-              ))}
+              <option value="All">All Examinations</option>
+              {['Railways', 'University Degree', 'Banking', 'SSC', 'Regulatory'].map((cat) => {
+                const filtered = examsList.filter((ex) => ex.category === cat && (selectedCategory === 'All' || selectedCategory === cat));
+                if (filtered.length === 0) return null;
+                const icon = cat === 'Railways' ? '🚂' : cat === 'University Degree' ? '🎓' : cat === 'Banking' ? '🏦' : cat === 'SSC' ? '🏛️' : '⚖️';
+                return (
+                  <optgroup key={cat} label={`${icon} ${cat}`}>
+                    {filtered.map((ex) => (
+                      <option key={ex.id} value={ex.id}>
+                        {ex.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                );
+              })}
             </select>
           </div>
 
@@ -181,11 +210,22 @@ export const MockTestsPage: React.FC = () => {
       </div>
 
       {/* Tests Grid */}
-      {loading ? (
+      {(() => {
+        const categoryExamIds = new Set(
+          examsList
+            .filter((e) => selectedCategory === 'All' || e.category === selectedCategory)
+            .map((e) => e.id)
+        );
+        const filteredTests = tests.filter((t) => {
+          if (selectedCategory === 'All') return true;
+          return categoryExamIds.has(t.examId) || examsList.some(e => e.category === selectedCategory && (e.slug === t.examSlug || e.name === t.examName));
+        });
+
+        return loading ? (
         <div className="py-20 text-center text-sm text-[var(--ink)] opacity-60">
           Loading mock tests...
         </div>
-      ) : tests.length === 0 ? (
+      ) : filteredTests.length === 0 ? (
         <div className="rounded border border-[var(--line)] bg-[var(--paper)] py-16 text-center space-y-3">
           <p className="font-semibold text-[var(--ink)]">No tests found matching your criteria.</p>
           <button
@@ -202,7 +242,7 @@ export const MockTestsPage: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {tests.map((test) => (
+          {filteredTests.map((test) => (
             <div
               key={test.id}
               className="flex flex-col justify-between rounded border border-[var(--line)] bg-[var(--surface)] p-6 hover:border-[var(--accent)] transition-colors shadow-sm"
@@ -267,7 +307,7 @@ export const MockTestsPage: React.FC = () => {
             </div>
           ))}
         </div>
-      )}
+      ); })()}
     </div>
   );
 };
