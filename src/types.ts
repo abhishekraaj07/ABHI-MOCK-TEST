@@ -103,6 +103,8 @@ export interface ActiveQuestion {
   topicName: string;
   isBookmarked: boolean;
   options: QuestionOption[];
+  explanation?: string | null;
+  shortcut?: string | null;
   selectedOption: string | null;
   isMarked: boolean;
   timeSpent: number;

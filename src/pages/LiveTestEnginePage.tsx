@@ -15,6 +15,9 @@ import {
   Send,
   RotateCcw,
   CheckCircle2,
+  XCircle,
+  Zap,
+  Lightbulb,
   Loader2,
   CloudOff,
   BarChart2,
@@ -49,6 +52,21 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
 
   // Bookmark toggles
   const [bookmarkedSet, setBookmarkedSet] = useState<Set<string>>(new Set());
+
+  // Instant feedback & detailed solution mode
+  const [instantFeedbackEnabled, setInstantFeedbackEnabled] = useState<boolean>(true);
+  const [feedbackMap, setFeedbackMap] = useState<
+    Record<
+      string,
+      {
+        isCorrect: boolean;
+        correctOptionKey: string;
+        correctOptionText: string;
+        explanation?: string | null;
+        shortcut?: string | null;
+      }
+    >
+  >({});
 
   // Debounced auto-save & crash prevention state/refs
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -145,7 +163,10 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
             id: o.id,
             optionKey: o.optionKey,
             optionText: o.optionText,
+            isCorrect: o.isCorrect,
           })),
+          explanation: q.explanation || null,
+          shortcut: q.shortcut || null,
           selectedOption: q.selectedOption || null,
           isMarked: Boolean(q.isMarked),
           timeSpent: q.timeSpent || 0,
@@ -387,6 +408,15 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
       });
 
       if (res.ok) {
+        try {
+          const json = await res.json();
+          if (json.feedback) {
+            setFeedbackMap((prev) => ({
+              ...prev,
+              [pending.questionId]: json.feedback,
+            }));
+          }
+        } catch {}
         setSaveStatus('saved');
         setLastSavedAt(new Date());
       } else {
@@ -482,6 +512,23 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
     const nextMap = new Map<string, QuestionAnswerState>(userAnswers).set(currentQ.questionId, updated);
     setUserAnswers(nextMap);
 
+    // Instant local evaluation if correct option is present in questions array
+    if (instantFeedbackEnabled) {
+      const correctOpt = currentQ.options?.find((o: any) => o.isCorrect);
+      if (correctOpt) {
+        setFeedbackMap((prev) => ({
+          ...prev,
+          [currentQ.questionId]: {
+            isCorrect: correctOpt.optionKey === optionKey,
+            correctOptionKey: correctOpt.optionKey,
+            correctOptionText: correctOpt.optionText,
+            explanation: currentQ.explanation,
+            shortcut: currentQ.shortcut,
+          },
+        }));
+      }
+    }
+
     // 1. Instantaneous local persistence
     saveDraftToLocalStorage(nextMap);
 
@@ -505,6 +552,15 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
     const nextMap = new Map<string, QuestionAnswerState>(userAnswers).set(currentQ.questionId, updated);
     setUserAnswers(nextMap);
 
+    // Clear feedback for this question on explicit reset
+    if (feedbackMap[currentQ.questionId]) {
+      setFeedbackMap((prev) => {
+        const next = { ...prev };
+        delete next[currentQ.questionId];
+        return next;
+      });
+    }
+
     saveDraftToLocalStorage(nextMap);
     triggerDebouncedSave(currentQ.questionId, null, updated.isMarked, updated.timeSpent);
   };
@@ -525,6 +581,15 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
 
     const nextMap = new Map<string, QuestionAnswerState>(userAnswers).set(currentQ.questionId, updated);
     setUserAnswers(nextMap);
+
+    // Clear feedback for this question on explicit reset
+    if (feedbackMap[currentQ.questionId]) {
+      setFeedbackMap((prev) => {
+        const next = { ...prev };
+        delete next[currentQ.questionId];
+        return next;
+      });
+    }
 
     saveDraftToLocalStorage(nextMap);
     triggerDebouncedSave(currentQ.questionId, updated.selectedOption, newMarked, updated.timeSpent);
@@ -901,6 +966,23 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
             )}
           </div>
 
+          {/* Instant Solution Toggle */}
+          <button
+            type="button"
+            id="instant-feedback-toggle"
+            onClick={() => setInstantFeedbackEnabled((prev) => !prev)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-semibold border transition-all cursor-pointer ${
+              instantFeedbackEnabled
+                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 shadow-xs'
+                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:text-zinc-800 dark:hover:text-zinc-200'
+            }`}
+            title="Toggle real-time right/wrong answer evaluation with step-by-step solution"
+          >
+            <Zap size={12} className={instantFeedbackEnabled ? 'fill-current text-amber-500' : ''} />
+            <span className="hidden sm:inline">Instant Solution:</span>
+            <span className="font-bold">{instantFeedbackEnabled ? 'ON' : 'OFF'}</span>
+          </button>
+
           {data.attempt.isPracticeMode ? (
             <div className="rounded border border-[var(--line)] bg-[var(--paper)] px-3 py-1 text-xs font-mono font-bold text-[var(--accent)]">
               Practice Mode
@@ -1066,32 +1148,113 @@ export const LiveTestEnginePage: React.FC<{ attemptId: string }> = ({ attemptId 
               <legend className="sr-only">Answer options for Question {safeIndex + 1}</legend>
               {(currentQ?.options || []).map((opt) => {
                 const isChecked = curAnswer?.selectedOption === opt.optionKey;
+                const hasAnswered = Boolean(curAnswer?.selectedOption);
+                const qFeedback = currentQ ? feedbackMap[currentQ.questionId] : undefined;
+
+                // Determine correctness for immediate feedback
+                const isKnownCorrect =
+                  opt.isCorrect !== undefined
+                    ? opt.isCorrect
+                    : qFeedback
+                    ? qFeedback.correctOptionKey === opt.optionKey
+                    : undefined;
+
+                let optContainerStyle =
+                  'border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] hover:border-gray-400';
+                let indicatorBadge = null;
+
+                if (instantFeedbackEnabled && hasAnswered) {
+                  if (isChecked && isKnownCorrect === true) {
+                    optContainerStyle =
+                      'border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/30 text-emerald-950 dark:text-emerald-100 ring-2 ring-emerald-500 shadow-xs font-semibold';
+                    indicatorBadge = (
+                      <span className="flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono ml-auto">
+                        <CheckCircle2 size={16} /> Correct (+{currentQ?.marks || 1})
+                      </span>
+                    );
+                  } else if (isChecked && isKnownCorrect === false) {
+                    optContainerStyle =
+                      'border-rose-500 bg-rose-50/80 dark:bg-rose-950/30 text-rose-950 dark:text-rose-100 ring-2 ring-rose-500 shadow-xs';
+                    indicatorBadge = (
+                      <span className="flex items-center gap-1 text-xs font-bold text-rose-600 dark:text-rose-400 font-mono ml-auto">
+                        <XCircle size={16} /> Incorrect
+                      </span>
+                    );
+                  } else if (!isChecked && isKnownCorrect === true) {
+                    optContainerStyle =
+                      'border-emerald-500 border-dashed bg-emerald-50/40 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-100 font-medium';
+                    indicatorBadge = (
+                      <span className="flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono ml-auto">
+                        <CheckCircle2 size={15} /> Correct Answer
+                      </span>
+                    );
+                  }
+                } else if (isChecked) {
+                  optContainerStyle =
+                    'border-[var(--accent)] bg-[var(--surface)] ring-1 ring-[var(--accent)] font-medium text-[var(--ink)] shadow-xs';
+                }
+
                 return (
                   <label
                     key={opt.optionKey}
                     id={`option-label-${opt.optionKey}`}
-                    className={`flex items-center gap-3.5 rounded border p-4 cursor-pointer transition-all ${
-                      isChecked
-                        ? 'border-[var(--accent)] bg-[var(--surface)] ring-1 ring-[var(--accent)] font-medium text-[var(--ink)] shadow-xs'
-                        : 'border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] hover:border-gray-400'
-                    }`}
+                    className={`flex items-center justify-between rounded-lg border p-4 cursor-pointer transition-all ${optContainerStyle}`}
                   >
-                    <input
-                      type="radio"
-                      name={`question-${currentQ?.questionId || safeIndex}`}
-                      value={opt.optionKey}
-                      checked={isChecked}
-                      onChange={() => handleOptionChange(opt.optionKey)}
-                      className="h-4 w-4 accent-[var(--accent)] cursor-pointer"
-                    />
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--paper)] border border-[var(--line)] font-mono text-xs font-bold">
-                      {opt.optionKey}
-                    </span>
-                    <span className="text-sm leading-relaxed">{opt.optionText}</span>
+                    <div className="flex items-center gap-3.5 flex-1 min-w-0 pr-2">
+                      <input
+                        type="radio"
+                        name={`question-${currentQ?.questionId || safeIndex}`}
+                        value={opt.optionKey}
+                        checked={isChecked}
+                        onChange={() => handleOptionChange(opt.optionKey)}
+                        className="h-4 w-4 accent-[var(--accent)] cursor-pointer shrink-0"
+                      />
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--paper)] border border-[var(--line)] font-mono text-xs font-bold shrink-0">
+                        {opt.optionKey}
+                      </span>
+                      <span className="text-sm leading-relaxed">{opt.optionText}</span>
+                    </div>
+                    {indicatorBadge}
                   </label>
                 );
               })}
             </fieldset>
+
+            {/* Real-time Detailed Explanation & Solution Card */}
+            {instantFeedbackEnabled && curAnswer?.selectedOption && (
+              <div className="mt-4 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/30 dark:bg-emerald-950/20 p-5 space-y-3 transition-all animate-in fade-in duration-200">
+                <div className="flex items-center justify-between border-b border-emerald-200/60 dark:border-emerald-900/40 pb-2">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                    <Lightbulb size={16} className="text-amber-500" />
+                    <span>Step-by-Step Solution & Concept</span>
+                  </div>
+                  {currentQ?.topicName && (
+                    <span className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+                      Topic: {currentQ.topicName}
+                    </span>
+                  )}
+                </div>
+
+                <div className="text-sm text-[var(--ink)] leading-relaxed font-sans">
+                  {feedbackMap[currentQ?.questionId || '']?.explanation ||
+                    currentQ?.explanation || (
+                      <p className="italic text-xs opacity-75">
+                        Answer submitted. Review the core conceptual theory for {currentQ?.subjectName} to strengthen problem solving.
+                      </p>
+                    )}
+                </div>
+
+                {(feedbackMap[currentQ?.questionId || '']?.shortcut || currentQ?.shortcut) && (
+                  <div className="rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 p-3 text-xs flex items-start gap-2 text-amber-900 dark:text-amber-200">
+                    <Zap size={15} className="mt-0.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <div>
+                      <span className="font-bold">Exam Pro Shortcut: </span>
+                      <span>{feedbackMap[currentQ?.questionId || '']?.shortcut || currentQ?.shortcut}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Bottom Space for smooth scrolling */}

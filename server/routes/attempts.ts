@@ -4,6 +4,31 @@ import { AuthRequest, authenticate } from '../middleware/auth';
 import { score, scoreItemizedQuestions } from '../scoring';
 import { SaveAnswerSchema } from '../validators/schemas';
 
+export interface AnswerFeedback {
+  isCorrect: boolean;
+  correctOptionKey: string;
+  correctOptionText: string;
+  explanation: string | null;
+  shortcut: string | null;
+}
+
+export function evaluateAnswerFeedback(
+  selectedOption: string | null | undefined,
+  options: Array<{ optionKey: string; optionText: string; isCorrect: boolean }>,
+  explanation?: string | null,
+  shortcut?: string | null
+): AnswerFeedback | null {
+  if (!selectedOption) return null;
+  const correctOpt = options.find((o) => o.isCorrect);
+  return {
+    isCorrect: correctOpt ? correctOpt.optionKey === selectedOption : false,
+    correctOptionKey: correctOpt?.optionKey || '',
+    correctOptionText: correctOpt?.optionText || '',
+    explanation: explanation || null,
+    shortcut: shortcut || null,
+  };
+}
+
 const router = Router();
 
 // GET /api/attempts - history for authenticated user (§11 My Tests)
@@ -93,10 +118,10 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
                     subject: { select: { id: true, name: true } },
                     topic: { select: { id: true, name: true } },
                     options: {
-                      // CRITICAL: NEVER include isCorrect during an active test session (§Phase 5)
-                      select: { id: true, optionKey: true, optionText: true },
+                      select: { id: true, optionKey: true, optionText: true, isCorrect: true },
                     },
-                    // Notice: explanation and shortcut are deliberately EXCLUDED here!
+                    explanation: true,
+                    shortcut: true,
                   },
                 },
               },
@@ -164,7 +189,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
       const q = tq.question;
       const ans = answerMap.get(q.id);
 
-      return {
+      const mappedQuestion: any = {
         questionId: q.id,
         order: tq.questionOrder || idx + 1,
         questionText: q.questionText,
@@ -175,11 +200,25 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
         subjectName: q.subject.name,
         topicName: q.topic?.name || 'General',
         isBookmarked: bookmarkedSet.has(q.id),
-        options: q.options.sort((a, b) => a.optionKey.localeCompare(b.optionKey)),
+        options: q.options
+          .map((opt) => ({
+            id: opt.id,
+            optionKey: opt.optionKey,
+            optionText: opt.optionText,
+            ...(isPracticeMode ? { isCorrect: opt.isCorrect } : {}),
+          }))
+          .sort((a, b) => a.optionKey.localeCompare(b.optionKey)),
         selectedOption: ans?.selectedOption || null,
         isMarked: ans?.isMarked || false,
         timeSpent: ans?.timeSpent || 0,
       };
+
+      if (isPracticeMode) {
+        mappedQuestion.explanation = q.explanation;
+        mappedQuestion.shortcut = q.shortcut;
+      }
+
+      return mappedQuestion;
     });
 
     return res.json({
@@ -317,6 +356,23 @@ router.post('/:id/answer', authenticate, async (req: AuthRequest, res: Response)
       },
     });
 
+    // Compute instant answer feedback for real-time practice and explanation
+    let feedback: AnswerFeedback | null = null;
+    if (selectedOption) {
+      const qData = await prisma.question.findUnique({
+        where: { id: questionId },
+        include: { options: true },
+      });
+      if (qData) {
+        feedback = evaluateAnswerFeedback(
+          selectedOption,
+          qData.options,
+          qData.explanation,
+          qData.shortcut
+        );
+      }
+    }
+
     return res.json({
       success: true,
       answer: {
@@ -324,6 +380,7 @@ router.post('/:id/answer', authenticate, async (req: AuthRequest, res: Response)
         selectedOption: updatedAnswer.selectedOption,
         isMarked: updatedAnswer.isMarked,
       },
+      feedback,
     });
   } catch (error) {
     console.error('Error saving answer:', error);
